@@ -2,7 +2,7 @@ import { getSession } from 'next-auth/react';
 
 export const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
   const session = await getSession();
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
   
   // Log session data for debugging
   console.log('fetchWithAuth - Session:', session);
