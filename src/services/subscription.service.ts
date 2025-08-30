@@ -19,6 +19,20 @@ export interface CheckoutSession {
   url: string;
 }
 
+export interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  monthlyCredits: number;
+  allowDocuments: boolean;
+  allowYoutubeAnalyze: boolean;
+  allowAIFlashcards: boolean;
+  allowAIStudyAssistant: boolean;
+  monthlyQuizLimit: number | null;
+  monthlyNotesLimit: number | null;
+  features: string[];
+}
+
 /**
  * Get the current user's subscription details
  */
@@ -103,3 +117,10 @@ export const updateSubscription = async (planId: string): Promise<Subscription> 
     throw error;
   }
 }; 
+
+export const getPlans = async (): Promise<Plan[]> => {
+  const response = await fetchWithAuth('/api/subscription/plans');
+  const data = await response.json();
+  if (!data.success) throw new Error('Failed to load plans');
+  return data.plans as Plan[];
+}

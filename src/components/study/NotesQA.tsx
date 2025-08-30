@@ -9,6 +9,7 @@ import {
   ArrowPathIcon
 } from '@heroicons/react/24/outline'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { fetchWithAuth } from '@/utils/fetchWithAuth'
 
 interface Note {
   _id: string
@@ -31,11 +32,7 @@ export default function NotesQA() {
       try {
         if (!session?.user?.accessToken) return
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notes`, {
-          headers: {
-            'Authorization': `Bearer ${session.user.accessToken}`,
-          },
-        })
+        const response = await fetchWithAuth('/api/notes')
 
         if (!response.ok) {
           throw new Error('Failed to fetch notes')
@@ -69,16 +66,10 @@ export default function NotesQA() {
         throw new Error('Selected note not found')
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/answer-question`, {
+      const response = await fetchWithAuth('/api/ai/answer-question', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.user?.accessToken}`,
-        },
-        body: JSON.stringify({
-          question,
-          context: selectedNoteContent
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, context: selectedNoteContent }),
       })
 
       if (!response.ok) {

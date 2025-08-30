@@ -11,6 +11,7 @@ import {
   LightBulbIcon
 } from '@heroicons/react/24/outline'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { fetchWithAuth } from '@/utils/fetchWithAuth'
 
 interface Problem {
   id: string
@@ -56,23 +57,11 @@ export default function PracticeProblems() {
       setCurrentProblemIndex(0)
       setResponse(null)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/generate-problems`, {
+      const response = await fetchWithAuth('/api/ai/generate-problems', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.user.accessToken}`,
-        },
-        body: JSON.stringify({
-          subject,
-          topic,
-          difficulty,
-          numProblems
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, topic, difficulty, numProblems }),
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to generate problems')
-      }
 
       const data = await response.json()
       setProblems(data.problems)
@@ -91,22 +80,15 @@ export default function PracticeProblems() {
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/check-answer`, {
+      const response = await fetchWithAuth('/api/ai/check-answer', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.user.accessToken}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           problemId: problems[currentProblemIndex].id,
           userAnswer,
           correctAnswer: problems[currentProblemIndex].correctAnswer
         }),
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to check answer')
-      }
 
       const data = await response.json()
       setResponse(data)

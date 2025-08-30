@@ -60,9 +60,11 @@ const handler = NextAuth({
   },
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (account?.provider === 'google' || account?.provider === 'github') {
+      if (account?.provider === 'google') {
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/${account.provider}`, {
+          console.log('Google OAuth sign-in attempt:', { email: user.email, name: user.name });
+
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/google`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -73,16 +75,29 @@ const handler = NextAuth({
               image: user.image,
               providerId: account.providerAccountId,
             }),
-          })
+          });
 
           if (!response.ok) {
-            return false
+            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+            console.error('Google auth failed:', errorData);
+            return false;
           }
+
+          const authData = await response.json();
+          console.log('Google auth successful:', authData);
+
+          // Store the backend token in the user object so it can be accessed in JWT callback
+          user.token = authData.token;
+          user.id = authData.user.id;
+          user.accessToken = authData.token;
+
+          return true;
         } catch (error) {
-          return false
+          console.error('Google OAuth error:', error);
+          return false;
         }
       }
-      return true
+      return true;
     },
     async jwt({ token, user, account }) {
       if (user) {
@@ -90,8 +105,17 @@ const handler = NextAuth({
         token.email = user.email
         token.name = user.name
         token.picture = user.image
+
+        // Set access token for both credentials and Google OAuth
         if (account?.provider === 'credentials') {
           token.accessToken = user.token
+        } else if (account?.provider === 'google') {
+          token.accessToken = user.accessToken || user.token
+        }
+
+        // For subsequent JWT refreshes, maintain the access token
+        if (user.accessToken) {
+          token.accessToken = user.accessToken
         }
       }
       return token

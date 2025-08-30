@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useSession, getSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import { 
   UserCircleIcon,
@@ -16,8 +16,11 @@ import {
 import Link from 'next/link'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { StudyProgress } from '@/types/study'
-import { getStudyProgress } from '@/services/dashboard.service'
+import { getStudyProgress, getDashboardStats } from '@/services/dashboard.service'
 import { getSubscription } from '@/services/subscription.service'
+import { fetchWithAuth } from '@/utils/fetchWithAuth'
+import { showToast } from '@/components/ui/Toast'
+import { getSessionCoalesced } from '@/utils/fetchWithAuth'
 
 interface UserProfile {
   name: string
@@ -25,6 +28,7 @@ interface UserProfile {
   image?: string
   joinedDate: string
   role: string
+  provider?: string
 }
 
 interface SubscriptionPlan {
@@ -37,8 +41,10 @@ interface SubscriptionPlan {
 
 export default function ProfilePage() {
   const { data: session } = useSession()
+  const accessToken = (session?.user as Record<string, unknown> | undefined)?.['accessToken'] as string | undefined
   const [isLoading, setIsLoading] = useState(true)
   const [studyProgress, setStudyProgress] = useState<StudyProgress | null>(null)
+  const [dashStats, setDashStats] = useState<{ totalFlashcards: number; totalNotes: number; totalQuizzes: number } | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
   const [isChangePasswordMode, setIsChangePasswordMode] = useState(false)
@@ -73,20 +79,12 @@ export default function ProfilePage() {
 
   const handleSaveProfile = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/update-profile`, {
+      const response = await fetchWithAuth('/api/auth/update-profile', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.user?.accessToken}`,
-        },
         body: JSON.stringify(editForm),
       })
 
       const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update profile')
-      }
 
       // Update local state with the returned user data
       setUserProfile(prev => prev ? {
@@ -97,6 +95,19 @@ export default function ProfilePage() {
 
       setIsEditMode(false)
       setError('')
+      
+      // Directly update the profile UI with the new data
+      setUserProfile(prev => ({
+        ...prev!,
+        name: data.user.name,
+        email: data.user.email
+      }))
+      
+      showToast({ 
+        type: 'success', 
+        title: 'Success', 
+        message: 'Profile updated successfully' 
+      });
     } catch (err) {
       console.error('Profile update error:', err)
       setError(err instanceof Error ? err.message : 'Failed to update profile')
@@ -111,6 +122,7 @@ export default function ProfilePage() {
       newPassword: '',
       confirmPassword: '',
     })
+    console.log('Change password clicked, user provider:', userProfile?.provider)
   }
 
   const handleSavePassword = async () => {
@@ -124,29 +136,34 @@ export default function ProfilePage() {
       return
     }
 
+    // For Google users, don't require current password
+    if (!userProfile?.provider || userProfile.provider !== 'google') {
+      if (!passwordForm.currentPassword) {
+        setError('Current password is required')
+        return
+      }
+    }
+
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/change-password`, {
+      const response = await fetchWithAuth('/api/auth/change-password', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.user?.accessToken}`,
-        },
         body: JSON.stringify({
-          currentPassword: passwordForm.currentPassword,
+          currentPassword: userProfile?.provider === 'google' ? undefined : passwordForm.currentPassword,
           newPassword: passwordForm.newPassword,
+          isGoogleUser: userProfile?.provider === 'google'
         }),
       })
 
       const data = await response.json()
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to change password')
-      }
-
       setIsChangePasswordMode(false)
       setError('')
-      // Show success message
-      alert('Password changed successfully')
+      
+      showToast({
+        type: 'success',
+        title: 'Success',
+        message: 'Password changed successfully'
+      })
     } catch (err) {
       console.error('Password change error:', err)
       setError(err instanceof Error ? err.message : 'Failed to change password')
@@ -176,23 +193,36 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const fetchProfileData = async () => {
-      if (!session?.user?.accessToken) return
+      // Wait for accessToken to be available
+      if (!accessToken) return
 
       try {
         setIsLoading(true)
         
-        // Fetch study progress
-        const progress = await getStudyProgress()
-        setStudyProgress(progress)
-
-        // Set user profile from session data
-        setUserProfile({
-          name: session.user.name || '',
-          email: session.user.email || '',
-          image: session.user.image || undefined,
-          joinedDate: new Date().toLocaleDateString(),
-          role: 'Student'
+        // Fetch study progress and dashboard stats in parallel
+        const [progress, stats, userData] = await Promise.all([
+          getStudyProgress() as unknown as Promise<StudyProgress>,
+          getDashboardStats(),
+          fetchWithAuth('/api/auth/me').then(res => res.json())
+        ])
+        setStudyProgress(progress as StudyProgress)
+        setDashStats({
+          totalFlashcards: stats.totalFlashcards,
+          totalNotes: stats.totalNotes,
+          totalQuizzes: stats.totalQuizzes,
         })
+
+        // Set user profile from backend data (most up-to-date)
+        setUserProfile({
+          name: userData.user.name || session?.user?.name || '',
+          email: userData.user.email || session?.user?.email || '',
+          image: session?.user?.image || undefined,
+          joinedDate: new Date().toLocaleDateString(),
+          role: 'Student',
+          provider: userData.user.provider || undefined
+        })
+        
+        console.log('User provider:', userData.user.provider)
 
         // Fetch subscription data from the backend
         try {
@@ -222,8 +252,47 @@ export default function ProfilePage() {
       }
     }
 
-    fetchProfileData()
-  }, [session])
+    if (accessToken) {
+      fetchProfileData()
+    }
+    // Only run this effect when accessToken changes
+  }, [accessToken])
+
+  // Live credits refresh (focus + interval) - using a reasonable interval
+  useEffect(() => {
+    if (!accessToken) return
+    let mounted = true
+    const refresh = async () => {
+      try {
+        const data = await getSubscription()
+        if (mounted) {
+          setSubscription({
+            id: data.plan,
+            name: data.plan.charAt(0).toUpperCase() + data.plan.slice(1),
+            price: data.plan === 'basic' ? '$0' : data.plan === 'pro' ? '$15' : '$49',
+            credits: data.credits,
+            nextRenewal: data.currentPeriodEnd ? new Date(data.currentPeriodEnd).toLocaleDateString() : undefined
+          })
+        }
+      } catch (_) {}
+    }
+    
+    // Only refresh on focus, not constantly
+    const onFocus = () => refresh()
+    window.addEventListener('focus', onFocus)
+    const onVisibility = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', onVisibility)
+    
+    // Use a more reasonable interval (60 seconds instead of 10)
+    const id = setInterval(refresh, 60000)
+    
+    return () => {
+      mounted = false
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+      clearInterval(id)
+    }
+  }, [accessToken])
 
   if (isLoading) {
     return (
@@ -390,22 +459,29 @@ export default function ProfilePage() {
                 </div>
               ) : isChangePasswordMode ? (
                 <div className="space-y-4">
-                  <div>
-                    <label htmlFor="currentPassword" className="block text-sm font-medium text-accent-silver mb-1">
-                      Current Password
-                    </label>
-                    <input
-                      type="password"
-                      id="currentPassword"
-                      name="currentPassword"
-                      value={passwordForm.currentPassword}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 bg-white/5 rounded-lg text-white focus:ring-2 focus:ring-accent-neon focus:outline-none"
-                    />
-                  </div>
+                  {userProfile?.provider !== 'google' && (
+                    <div>
+                      <label htmlFor="currentPassword" className="block text-sm font-medium text-accent-silver mb-1">
+                        Current Password
+                      </label>
+                      <input
+                        type="password"
+                        id="currentPassword"
+                        name="currentPassword"
+                        value={passwordForm.currentPassword}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 bg-white/5 rounded-lg text-white focus:ring-2 focus:ring-accent-neon focus:outline-none"
+                      />
+                    </div>
+                  )}
+                  {userProfile?.provider === 'google' && (
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-sm mb-2">
+                      You're using Google to sign in. You can set a password to also sign in with email.
+                    </div>
+                  )}
                   <div>
                     <label htmlFor="newPassword" className="block text-sm font-medium text-accent-silver mb-1">
-                      New Password
+                      {userProfile?.provider === 'google' ? 'Set Password' : 'New Password'}
                     </label>
                     <input
                       type="password"
@@ -418,7 +494,7 @@ export default function ProfilePage() {
                   </div>
                   <div>
                     <label htmlFor="confirmPassword" className="block text-sm font-medium text-accent-silver mb-1">
-                      Confirm New Password
+                      Confirm {userProfile?.provider === 'google' ? 'Password' : 'New Password'}
                     </label>
                     <input
                       type="password"
@@ -467,7 +543,7 @@ export default function ProfilePage() {
           <div className="bg-glass backdrop-blur-sm rounded-xl p-6 ring-1 ring-accent-silver/10">
             <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
               <CreditCardIcon className="h-5 w-5 text-accent-neon" />
-              Subscription & Credits
+              Subscription & Limits
             </h2>
 
             <div className="mb-6">
@@ -517,20 +593,7 @@ export default function ProfilePage() {
                 {subscription.credits} credits remaining this month
               </p>
               
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-accent-silver">Flashcard generation</span>
-                  <span className="text-white">1 credit</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-accent-silver">Quiz generation</span>
-                  <span className="text-white">2 credits</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-accent-silver">Notes analysis</span>
-                  <span className="text-white">3 credits</span>
-                </div>
-              </div>
+              <LiveCreditCosts />
             </div>
           </div>
         </motion.div>
@@ -538,3 +601,23 @@ export default function ProfilePage() {
     </div>
   )
 } 
+
+function LiveCreditCosts() {
+  // If we later expose an API for dynamic credit costs, fetch here.
+  // For now, import from backend config equivalent by mirroring constants.
+  const items = [
+    { label: 'Flashcard generation', cost: 1 },
+    { label: 'Quiz generation', cost: 2 },
+    { label: 'Notes analysis', cost: 3 },
+  ] as const
+  return (
+    <div className="space-y-2">
+      {items.map((x) => (
+        <div key={x.label} className="flex justify-between text-sm">
+          <span className="text-accent-silver">{x.label}</span>
+          <span className="text-white">{x.cost} {x.cost === 1 ? 'credit' : 'credits'}</span>
+        </div>
+      ))}
+    </div>
+  )
+}

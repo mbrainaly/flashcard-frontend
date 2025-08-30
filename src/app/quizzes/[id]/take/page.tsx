@@ -1,18 +1,21 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { IQuiz, QuizSubmissionResult } from '@/types/quiz'
 import QuizSession from '@/components/quiz/QuizSession'
 import QuizResults from '@/components/quiz/QuizResults'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { fetchWithAuth } from '@/utils/fetchWithAuth'
 
 type QuizState = 'loading' | 'taking' | 'completed'
 
-export default function TakeQuizPage({ params }: { params: { id: string } }) {
+export default function TakeQuizPage() {
   const router = useRouter()
-  const { data: session } = useSession()
+  const params = useParams()
+  const id = (params?.id as string) || ''
+  const { data: session, status } = useSession()
   const [quiz, setQuiz] = useState<IQuiz | null>(null)
   const [quizState, setQuizState] = useState<QuizState>('loading')
   const [result, setResult] = useState<QuizSubmissionResult | null>(null)
@@ -21,32 +24,27 @@ export default function TakeQuizPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     const fetchQuiz = async () => {
       try {
-        const { id } = await params;
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/quizzes/${id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session?.user?.accessToken}`,
-            },
-          }
-        )
+        const response = await fetchWithAuth(`/api/quizzes/${id}`)
 
         if (!response.ok) {
           throw new Error('Failed to fetch quiz')
         }
 
         const data = await response.json()
-        setQuiz(data.data)
+        const q = data.quiz || data.data
+        setQuiz(q)
         setQuizState('taking')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load quiz')
       }
     }
 
-    if (session?.user?.accessToken) {
+    if (status === 'authenticated' && id) {
       fetchQuiz()
+    } else if (status === 'unauthenticated') {
+      setError('Please sign in to take the quiz')
     }
-  }, [params, session?.user?.accessToken])
+  }, [id, status, session?.user?.accessToken])
 
   const handleQuizComplete = (result: QuizSubmissionResult) => {
     setResult(result)

@@ -32,7 +32,7 @@ import { DashboardStats, RecentActivity } from '@/types/dashboard'
 import { LearningStats as LearningStatsService } from '@/services/dashboard.service'
 
 export default function DashboardPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [isLoading, setIsLoading] = useState(true)
   const [showAllActivities, setShowAllActivities] = useState(false)
   const [dailyActivity, setDailyActivity] = useState<DailyActivity[]>([])
@@ -42,26 +42,35 @@ export default function DashboardPage() {
   const [learningStats, setLearningStats] = useState<StudyProgress | null>(null)
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (!session?.user?.accessToken) return
+    // While auth status is loading, keep spinner
+    if (status === 'loading') {
+      setIsLoading(true)
+      return
+    }
 
+    // If unauthenticated, stop spinner and optionally redirect or show message
+    if (status === 'unauthenticated') {
+      setIsLoading(false)
+      return
+    }
+
+    const fetchDashboardData = async () => {
       try {
         setIsLoading(true)
-        
-        // Fetch real stats, activities, and daily activity in parallel
+
         const [dashboardStats, activities, dailyStats, progress, learningStatsData] = await Promise.all([
           getDashboardStats(),
           getRecentActivities(),
           getDailyActivityStats(7),
           getStudyProgress(),
           getLearningStats()
-        ]);
+        ])
 
-        setStats(dashboardStats);
-        setRecentActivity(activities);
-        setDailyActivity(dailyStats);
-        setStudyProgress(progress);
-        setLearningStats(learningStatsData);
+        setStats(dashboardStats)
+        setRecentActivity(activities)
+        setDailyActivity(dailyStats)
+        setStudyProgress(progress)
+        setLearningStats(learningStatsData)
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
       } finally {
@@ -70,12 +79,20 @@ export default function DashboardPage() {
     }
 
     fetchDashboardData()
-  }, [session])
+  }, [status])
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-accent-obsidian flex items-center justify-center">
         <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-accent-obsidian flex items-center justify-center">
+        <div className="text-center text-accent-silver">Please sign in to view your dashboard.</div>
       </div>
     )
   }
@@ -322,7 +339,7 @@ export default function DashboardPage() {
           className="grid grid-cols-2 md:grid-cols-4 gap-4"
         >
           {[
-            { label: 'Create Flashcards', icon: BookOpenIcon, href: '/decks/create' },
+            { label: 'Create Flashcards', icon: BookOpenIcon, href: '/decks' },
             { label: 'Take Quiz', icon: AcademicCapIcon, href: '/quizzes' },
             { label: 'Write Notes', icon: DocumentTextIcon, href: '/notes' },
             { label: 'Study Assistant', icon: BoltIcon, href: '/study' }

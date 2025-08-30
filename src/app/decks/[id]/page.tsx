@@ -307,7 +307,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 <h1 className="text-2xl font-bold text-white">{deck.title}</h1>
                 <Link
                   href={`/decks/${id}/edit`}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-accent-neon bg-accent-neon/10 rounded-lg hover:bg-accent-neon/20 transition-colors"
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs sm:text-sm font-medium text-accent-neon rounded-full ring-1 ring-accent-neon/30 hover:bg-accent-neon/10 transition-colors"
                 >
                   <PencilIcon className="h-4 w-4" />
                   Edit Deck
@@ -318,12 +318,13 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               </p>
             </div>
 
-            <div className="mt-4 sm:mt-0 flex items-center gap-4">
+            <div className="mt-4 sm:mt-0 flex flex-wrap items-center gap-2 sm:gap-3 justify-start sm:justify-end">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => router.push(`/decks/${id}/study`)}
-                className="inline-flex items-center gap-2 rounded-full bg-accent-neon px-4 py-2 text-sm font-semibold text-accent-obsidian shadow-neon transition-all duration-300 hover:shadow-none hover:bg-white"
+                aria-label="Start Study Session"
+                className="inline-flex items-center gap-2 rounded-full bg-accent-neon px-5 py-2.5 text-sm font-semibold text-accent-obsidian shadow-neon transition-all duration-200 hover:bg-accent-neon/90 focus:outline-none focus:ring-2 focus:ring-accent-neon/40"
               >
                 <PlayIcon className="h-5 w-5" />
                 Start Study Session
@@ -333,7 +334,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleOpenAIGenerator}
-                className="inline-flex items-center gap-2 rounded-full bg-accent-neon px-4 py-2 text-sm font-semibold text-accent-obsidian shadow-neon transition-all duration-300 hover:shadow-none hover:bg-white"
+                aria-label="Open AI Generator"
+                className="inline-flex items-center gap-2 rounded-full border border-accent-neon/40 bg-accent-neon/10 px-5 py-2.5 text-sm font-semibold text-accent-neon transition-colors duration-200 hover:bg-accent-neon/15 focus:outline-none focus:ring-2 focus:ring-accent-neon/30"
               >
                 <SparklesIcon className="h-5 w-5" />
                 AI Generate
@@ -343,7 +345,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleDeleteDeck}
-                className="inline-flex items-center gap-2 rounded-full bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-500 transition-all duration-300 hover:bg-red-500/20"
+                aria-label="Delete Deck"
+                className="inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-5 py-2.5 text-sm font-semibold text-red-400 transition-colors duration-200 hover:bg-red-500/15 focus:outline-none focus:ring-2 focus:ring-red-500/30"
               >
                 <TrashIcon className="h-5 w-5" />
                 Delete

@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
   ClockIcon, 
-  GlobeAltIcon, 
-  LockClosedIcon,
   QuestionMarkCircleIcon,
   AdjustmentsHorizontalIcon,
   ExclamationCircleIcon,
@@ -40,9 +38,9 @@ const defaultConfig: QuizConfig = {
 
 interface ValidationErrors {
   title?: string
-  questionTypes?: string
   numberOfQuestions?: string
   timeLimit?: string
+  questionTypes?: string
 }
 
 export default function QuizConfigForm({
@@ -64,26 +62,22 @@ export default function QuizConfigForm({
   const validateConfig = (): boolean => {
     const newErrors: ValidationErrors = {}
 
-    // Title validation
     if (!config.title.trim()) {
       newErrors.title = 'Title is required'
     } else if (config.title.length > 100) {
       newErrors.title = 'Title must be less than 100 characters'
     }
 
-    // Question types validation
     if (config.questionTypes.length === 0) {
       newErrors.questionTypes = 'Select at least one question type'
     }
 
-    // Number of questions validation
     if (config.numberOfQuestions < 5) {
       newErrors.numberOfQuestions = 'Minimum 5 questions required'
     } else if (config.numberOfQuestions > (suggestedQuestions || 20)) {
       newErrors.numberOfQuestions = `Maximum ${suggestedQuestions || 20} questions allowed`
     }
 
-    // Time limit validation
     if (config.timeLimit !== null) {
       if (config.timeLimit < 1) {
         newErrors.timeLimit = 'Time limit must be at least 1 minute'
@@ -98,26 +92,21 @@ export default function QuizConfigForm({
 
   const handleChange = (key: keyof QuizConfig, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }))
-    // Clear error for the field being changed
     if (errors[key as keyof ValidationErrors]) {
       setErrors(prev => ({ ...prev, [key]: undefined }))
     }
   }
 
-  const handleQuestionTypeToggle = (type: QuizConfig['questionTypes'][0]) => {
+  const handleQuestionTypeToggle = (type: QuizConfig['questionTypes'][0]) =>
     setConfig(prev => {
       const newTypes = prev.questionTypes.includes(type)
         ? prev.questionTypes.filter(t => t !== type)
         : [...prev.questionTypes, type]
-      
-      // Clear question types error if at least one type is selected
       if (newTypes.length > 0 && errors.questionTypes) {
         setErrors(prev => ({ ...prev, questionTypes: undefined }))
       }
-
       return { ...prev, questionTypes: newTypes }
     })
-  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -254,30 +243,6 @@ export default function QuizConfigForm({
               />
               <ClockIcon className="h-5 w-5 text-accent-silver" />
             </div>
-          </div>
-
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-accent-silver">
-              Visibility
-            </label>
-            <button
-              type="button"
-              onClick={() => handleChange('isPublic', !config.isPublic)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
-                bg-white/5 hover:bg-white/10 transition-colors"
-            >
-              {config.isPublic ? (
-                <>
-                  <GlobeAltIcon className="h-5 w-5 text-accent-neon" />
-                  <span className="text-accent-neon">Public</span>
-                </>
-              ) : (
-                <>
-                  <LockClosedIcon className="h-5 w-5 text-accent-silver" />
-                  <span className="text-accent-silver">Private</span>
-                </>
-              )}
-            </button>
           </div>
         </div>
 

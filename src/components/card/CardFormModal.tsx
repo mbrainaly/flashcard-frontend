@@ -36,6 +36,7 @@ export default function CardFormModal({
   const [error, setError] = useState('')
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   const {
     register,
@@ -104,20 +105,28 @@ export default function CardFormModal({
     onClose()
   }
 
+  const handleFileSelect = (file: File) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Only image files are supported')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      setError('Image size should be less than 5MB')
+      return
+    }
+    setError('')
+    setSelectedImage(file)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        setError('Image size should be less than 5MB')
-        return
-      }
-      setSelectedImage(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
+    if (file) handleFileSelect(file)
   }
 
   const handleFormSubmit = async (data: CreateCardInput) => {
@@ -167,7 +176,24 @@ export default function CardFormModal({
           <label className="block text-sm font-medium text-white">
             Image (optional)
           </label>
-          <div className="mt-1 flex justify-center rounded-lg border border-dashed border-accent-silver/30 px-6 py-10">
+          <div
+            className={`mt-1 flex justify-center rounded-lg border border-dashed px-6 py-10 transition-colors ${
+              isDragging ? 'border-accent-neon/60 bg-accent-neon/5' : 'border-accent-silver/30'
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setIsDragging(true)
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setIsDragging(false)
+              const file = e.dataTransfer?.files?.[0]
+              if (file) handleFileSelect(file)
+            }}
+            role="button"
+            aria-label="Image dropzone"
+          >
             <div className="text-center">
               {imagePreview ? (
                 <div className="relative inline-block">

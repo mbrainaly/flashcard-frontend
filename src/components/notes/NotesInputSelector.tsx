@@ -8,8 +8,8 @@ import { TextItem } from 'pdfjs-dist/types/src/display/api'
 import mammoth from 'mammoth'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
-// Initialize PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+// Initialize PDF.js worker using a static file served from /public (compatible with Turbopack)
+(pdfjsLib as any).GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
 
 interface NotesInputSelectorProps {
   onSubmit: (content: string, type: 'prompt' | 'content' | 'video') => void

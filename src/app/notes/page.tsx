@@ -4,6 +4,7 @@ import { useState, Suspense, lazy } from 'react'
 import { motion } from 'framer-motion'
 import { useSession } from 'next-auth/react'
 import NotesInputSelector from '@/components/notes/NotesInputSelector'
+import { fetchWithAuth } from '@/utils/fetchWithAuth'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
 // Dynamically import the NotesEditor component to prevent server-side rendering issues
@@ -32,12 +33,9 @@ export default function NotesGeneratorPage() {
 
       console.log('Submitting content:', { type, content: processedContent });
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notes/generate`, {
+      const response = await fetchWithAuth('/api/notes/generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.user.accessToken}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: processedContent, type }),
       });
 
@@ -102,12 +100,9 @@ export default function NotesGeneratorPage() {
         throw new Error('Not authenticated')
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notes/save`, {
+      const response = await fetchWithAuth('/api/notes/save', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.user.accessToken}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, title }),
       })
 

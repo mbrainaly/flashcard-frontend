@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ICard } from '@/types/card'
 import { useSession } from 'next-auth/react'
+import { fetchWithAuth } from '@/utils/fetchWithAuth'
 import {
   ArrowPathIcon,
   CheckIcon,
@@ -47,12 +48,9 @@ export default function ExamMode({
       console.log('Submitting answer with data:', requestData)
       console.log('Using token:', session.user.accessToken)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/evaluate-answer`, {
+      const response = await fetchWithAuth('/api/ai/evaluate-answer', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.user.accessToken}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestData),
       })
 

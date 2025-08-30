@@ -10,6 +10,7 @@ import {
   AcademicCapIcon
 } from '@heroicons/react/24/outline'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { fetchWithAuth } from '@/utils/fetchWithAuth'
 
 interface Subject {
   id: string
@@ -43,16 +44,10 @@ export default function ConceptExplanations() {
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/explain-concept`, {
+      const response = await fetchWithAuth('/api/ai/explain-concept', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.user?.accessToken}`,
-        },
-        body: JSON.stringify({
-          concept,
-          subject: selectedSubject
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concept, subject: selectedSubject }),
       })
 
       if (!response.ok) {

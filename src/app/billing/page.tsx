@@ -11,7 +11,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { CheckIcon } from '@heroicons/react/20/solid'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
-import { createCheckoutSession, updateSubscription, getSubscription, Subscription } from '@/services/subscription.service'
+import { createCheckoutSession, updateSubscription, getSubscription, getPlans, Subscription, Plan } from '@/services/subscription.service'
 import { loadStripe } from '@stripe/stripe-js'
 
 // Initialize Stripe with your publishable key
@@ -33,10 +33,12 @@ interface BillingPlan {
 // Component that uses useSearchParams
 function BillingContent() {
   const { data: session, status } = useSession()
+  const accessToken = (session?.user as Record<string, unknown> | undefined)?.['accessToken'] as string | undefined
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'plans' | 'history'>('plans')
+  const [dbPlans, setDbPlans] = useState<Plan[] | null>(null)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
@@ -44,7 +46,7 @@ function BillingContent() {
   useEffect(() => {
     console.log('Session status:', status)
     console.log('Session data:', session)
-    console.log('Access token:', session?.user?.accessToken)
+    console.log('Access token:', accessToken)
     
     // Redirect to login if not authenticated
     if (status === 'unauthenticated') {
@@ -57,71 +59,27 @@ function BillingContent() {
   const canceled = searchParams.get('canceled')
   const planId = searchParams.get('plan')
 
-  // Define plans
-  const plans: BillingPlan[] = [
-    {
-      id: 'basic',
-      name: 'Basic',
-      price: '$0',
-      monthlyPrice: 0,
-      description: 'Perfect for getting started with flashcards.',
-      isCurrent: subscription?.plan === 'basic',
-      isSelected: planId === 'basic',
-      features: [
-        'Up to 50 flashcards',
-        'Basic AI card generation',
-        'Study progress tracking',
-        'Mobile-friendly interface',
-        'Community templates',
-      ]
-    },
-    {
-      id: 'pro',
-      name: 'Pro',
-      price: '$15',
-      monthlyPrice: 15,
-      description: 'Ideal for serious learners and students.',
-      isPopular: true,
-      featured: true,
-      isCurrent: subscription?.plan === 'pro',
-      isSelected: planId === 'pro',
-      features: [
-        'Unlimited flashcards',
-        'Advanced AI generation',
-        'Custom study schedules',
-        'Performance analytics',
-        'Priority support',
-        'Offline access',
-        'Export capabilities',
-      ]
-    },
-    {
-      id: 'team',
-      name: 'Team',
-      price: '$49',
-      monthlyPrice: 49,
-      description: 'For educational institutions and study groups.',
-      isCurrent: subscription?.plan === 'team',
-      isSelected: planId === 'team',
-      features: [
-        'Everything in Pro',
-        'Team collaboration',
-        'Admin dashboard',
-        'Usage analytics',
-        'API access',
-        'Custom branding',
-        'Dedicated support',
-      ]
-    }
-  ]
+  // Build plans from backend
+  const plans: BillingPlan[] = (dbPlans || []).map((p) => ({
+    id: p.id,
+    name: p.name === 'Basic' ? 'Free' : p.name,
+    price: `$${p.price}`,
+    monthlyPrice: p.price,
+    description: p.name === 'Basic' ? 'Everything you need to try AIFlash for free.' : p.name === 'Pro' ? 'Advanced tools for serious learners.' : 'Best for organizations that need scale.',
+    isPopular: p.id === 'pro',
+    featured: p.id === 'pro',
+    isCurrent: subscription?.plan === p.id,
+    isSelected: planId === p.id,
+    features: p.features,
+  }))
 
   const billingHistory = [
     {
       id: '1',
       date: subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString() : new Date().toLocaleDateString(),
       amount: subscription?.plan === 'basic' ? 0 : subscription?.plan === 'pro' ? 15 : 49,
-      status: `${subscription?.plan === 'basic' ? 'Basic' : subscription?.plan === 'pro' ? 'Pro' : 'Team'} Plan`,
-      description: `${subscription?.plan === 'basic' ? 'Basic' : subscription?.plan === 'pro' ? 'Pro' : 'Team'} Plan - Monthly`
+      status: `${subscription?.plan === 'basic' ? 'Free' : subscription?.plan === 'pro' ? 'Pro' : 'Enterprise'} Plan`,
+      description: `${subscription?.plan === 'basic' ? 'Free' : subscription?.plan === 'pro' ? 'Pro' : 'Enterprise'} Plan - Monthly`
     }
   ]
 
@@ -134,7 +92,7 @@ function BillingContent() {
       if (planId === 'basic') {
         // Downgrade to basic plan (free)
         await updateSubscription(planId)
-        setMessage({ type: 'success', text: 'Successfully downgraded to Basic plan' })
+        setMessage({ type: 'success', text: 'Successfully downgraded to Free plan' })
         // Refresh subscription data
         fetchSubscription()
       } else {
@@ -151,7 +109,7 @@ function BillingContent() {
           } else {
             throw new Error('No checkout URL returned from server')
           }
-        } catch (checkoutError) {
+        } catch (checkoutError: any) {
           console.error('Checkout session error:', checkoutError)
           setMessage({ 
             type: 'error', 
@@ -173,7 +131,7 @@ function BillingContent() {
   // Fetch subscription data
   const fetchSubscription = async () => {
     // Only fetch if authenticated
-    if (status !== 'authenticated' || !session?.user?.accessToken) {
+    if (status !== 'authenticated' || !accessToken) {
       console.log('Not authenticated, skipping subscription fetch')
       return
     }
@@ -202,7 +160,7 @@ function BillingContent() {
       setIsLoading(true)
       if (planId) {
         await updateSubscription(planId)
-        setMessage({ type: 'success', text: `Successfully upgraded to ${planId === 'pro' ? 'Pro' : 'Team'} plan` })
+        setMessage({ type: 'success', text: `Successfully upgraded to ${planId === 'pro' ? 'Pro' : 'Enterprise'} plan` })
         // Refresh subscription data
         await fetchSubscription()
         // Remove query parameters
@@ -218,10 +176,23 @@ function BillingContent() {
 
   // Fetch subscription data when authenticated
   useEffect(() => {
-    if (status === 'authenticated' && session?.user?.accessToken) {
+    if (status === 'authenticated' && accessToken) {
       fetchSubscription()
     }
   }, [status, session])
+
+  // Fetch plans from backend
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const p = await getPlans()
+        setDbPlans(p)
+      } catch (e) {
+        console.error('Failed to load plans', e)
+      }
+    }
+    load()
+  }, [])
 
   // Handle URL parameters for payment success/cancel
   useEffect(() => {
@@ -245,7 +216,7 @@ function BillingContent() {
     
     // Clean up URL parameters only for success/canceled
     if (success || canceled) {
-      router.replace('/billing', undefined, { shallow: true })
+      router.replace('/billing')
     }
   }, [success, canceled, planId, router])
 
@@ -490,7 +461,7 @@ function BillingContent() {
 function BillingLoading() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <LoadingSpinner size="lg" />
+      <LoadingSpinner />
       <p className="ml-2 text-gray-700 dark:text-gray-300">Loading billing information...</p>
     </div>
   )

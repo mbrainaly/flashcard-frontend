@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { ICard } from '@/types/card'
 import { useSession } from 'next-auth/react'
+import { fetchWithAuth } from '@/utils/fetchWithAuth'
 import {
   CheckIcon,
   XMarkIcon,
@@ -83,17 +84,10 @@ export default function QuizMode({ card, onNext, onReview }: QuizModeProps) {
     setSelectedOption(null)
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/generate-quiz`, {
+      const response = await fetchWithAuth('/api/ai/generate-quiz', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.user.accessToken}`,
-        },
-        body: JSON.stringify({
-          cardId: card._id,
-          front: card.front,
-          back: card.back,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: card._id, front: card.front, back: card.back }),
       })
 
       if (!response.ok) {

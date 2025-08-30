@@ -84,7 +84,6 @@ export default function LoginPage() {
             <div className="flex-1">
               <div className="space-y-4">
                 <SocialLoginButton provider="google" />
-                <SocialLoginButton provider="github" />
               </div>
 
               <div className="relative mt-6">

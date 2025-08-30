@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import QuizGenerator from '@/components/quiz/QuizGenerator'
 import QuizConfigForm, { QuizConfig } from '@/components/quiz/QuizConfigForm'
+import { fetchWithAuth } from '@/utils/fetchWithAuth'
 
 type GenerationStep = 'input' | 'config' | 'generating'
 
@@ -36,16 +37,10 @@ export default function QuizGenerationPage() {
       setStep('generating')
       setError(null)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quizzes`, {
+      const response = await fetchWithAuth('/api/quizzes', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.user?.accessToken}`,
-        },
-        body: JSON.stringify({
-          ...config,
-          content: analysis.content,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...config, content: analysis.content }),
       })
 
       if (!response.ok) {

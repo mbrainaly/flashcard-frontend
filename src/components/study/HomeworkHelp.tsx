@@ -12,6 +12,7 @@ import {
   BookOpenIcon
 } from '@heroicons/react/24/outline'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { fetchWithAuth } from '@/utils/fetchWithAuth'
 
 interface Subject {
   id: string
@@ -65,11 +66,8 @@ export default function HomeworkHelp() {
         formData.append('file', file)
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/homework-help`, {
+      const response = await fetchWithAuth('/api/ai/homework-help', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.user?.accessToken}`,
-        },
         body: formData,
       })
 

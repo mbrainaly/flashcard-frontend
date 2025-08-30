@@ -7,6 +7,7 @@ import TextInput from '@/components/ai/inputs/TextInput'
 import DocumentUpload from '@/components/ai/inputs/DocumentUpload'
 import URLInput from '@/components/ai/inputs/URLInput'
 import type { InputTab } from '@/components/ai/inputs/TabSelector'
+import { fetchWithAuth } from '@/utils/fetchWithAuth'
 
 interface QuizInputSelectorProps {
   onAnalysisComplete: (analysis: {
@@ -30,12 +31,9 @@ export default function QuizInputSelector({ onAnalysisComplete }: QuizInputSelec
       setIsAnalyzing(true)
       setError(null)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/analyze-quiz-content`, {
+      const response = await fetchWithAuth('/api/ai/analyze-quiz-content', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.user?.accessToken}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
       })
 
@@ -62,9 +60,7 @@ export default function QuizInputSelector({ onAnalysisComplete }: QuizInputSelec
 
   const handleTextSubmit = (text: string) => {
     setContent(text)
-    if (text.trim()) {
-      analyzeContent(text)
-    }
+    // Do not auto-analyze while typing; user will click Analyze
   }
 
   const handleDocumentSubmit = async (file: File) => {
@@ -75,11 +71,8 @@ export default function QuizInputSelector({ onAnalysisComplete }: QuizInputSelec
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/analyze-document`, {
+      const response = await fetchWithAuth('/api/ai/analyze-document', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.user?.accessToken}`,
-        },
         body: formData,
       })
 
@@ -112,12 +105,9 @@ export default function QuizInputSelector({ onAnalysisComplete }: QuizInputSelec
       setError(null)
 
       // First get the transcript from the notes API
-      const transcriptResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notes/generate`, {
+      const transcriptResponse = await fetchWithAuth('/api/notes/generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.user?.accessToken}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: url, type: 'video' }),
       })
 
@@ -163,9 +153,9 @@ export default function QuizInputSelector({ onAnalysisComplete }: QuizInputSelec
     <div className="space-y-6">
       <TabSelector activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <div className="bg-glass backdrop-blur-sm rounded-xl p-6 ring-1 ring-accent-silver/10">
+      <div className="bg-glass backdrop-blur-sm rounded-xl p-6 ring-1 ring-accent-silver/10 relative">
         {activeTab === 'text' && (
-          <TextInput onChange={handleTextSubmit} />
+          <TextInput onChange={handleTextSubmit} value={content} onAnalyze={() => analyzeContent(content)} analyzeDisabled={!content.trim() || isAnalyzing} />
         )}
 
         {activeTab === 'document' && (
