@@ -16,13 +16,36 @@ export default function NotesGeneratorPage() {
   const [generatedNotes, setGeneratedNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const handleContentSubmit = async (content: string, type: 'prompt' | 'content' | 'video') => {
+  const handleContentSubmit = async (content: string, type: 'prompt' | 'content' | 'video', file?: File) => {
     try {
       setStep('writing')
       setError(null)
 
       if (!session?.user?.accessToken) {
         throw new Error('Not authenticated')
+      }
+
+      // Handle PDF file upload
+      if (file && file.type === 'application/pdf') {
+        console.log('Processing PDF file:', file.name);
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetchWithAuth('/api/ai/process-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to process PDF');
+        }
+
+        const data = await response.json();
+        setGeneratedNotes(data.content);
+        setStep('editing');
+        return;
       }
 
       // Clean up URL if it's a video type

@@ -3,16 +3,11 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { DocumentTextIcon, DocumentIcon, VideoCameraIcon } from '@heroicons/react/24/outline'
-import * as pdfjsLib from 'pdfjs-dist'
-import { TextItem } from 'pdfjs-dist/types/src/display/api'
 import mammoth from 'mammoth'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
-// Initialize PDF.js worker using a static file served from /public (compatible with Turbopack)
-(pdfjsLib as any).GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
-
 interface NotesInputSelectorProps {
-  onSubmit: (content: string, type: 'prompt' | 'content' | 'video') => void
+  onSubmit: (content: string, type: 'prompt' | 'content' | 'video', file?: File) => void
 }
 
 type InputType = 'prompt' | 'content' | 'video'
@@ -48,6 +43,14 @@ export default function NotesInputSelector({ onSubmit }: NotesInputSelectorProps
     if (!content.trim()) {
       alert('Please enter some content')
       return
+    }
+
+    // Check if this is a PDF file upload
+    const uploadedFile = (window as any).uploadedFile;
+    if (content.startsWith('[PDF_FILE_UPLOADED:') && uploadedFile?.type === 'pdf') {
+      // For PDF files, pass the file object to the parent
+      onSubmit(content.trim(), selectedType || 'content', uploadedFile.file);
+      return;
     }
 
     // Additional validation for video URLs
@@ -91,21 +94,18 @@ export default function NotesInputSelector({ onSubmit }: NotesInputSelectorProps
       setError(null)
 
       if (file.type === 'application/pdf') {
-        // Handle PDF file
-        const arrayBuffer = await file.arrayBuffer()
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        // For PDF files, we'll send them directly to the backend
+        // Set a placeholder content that indicates a PDF was uploaded
+        setContent(`[PDF_FILE_UPLOADED:${file.name}]`)
         
-        let fullText = ''
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i)
-          const textContent = await page.getTextContent()
-          const pageText = textContent.items
-            .map((item) => (item as TextItem).str || '')
-            .join(' ')
-          fullText += pageText + '\n\n'
+        // Store the file for later processing
+        const fileData = {
+          file,
+          type: 'pdf'
         }
+        // We'll handle the actual processing when the user clicks Generate
+        ;(window as any).uploadedFile = fileData
         
-        setContent(fullText.trim())
       } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         // Handle DOCX file
         const arrayBuffer = await file.arrayBuffer()
