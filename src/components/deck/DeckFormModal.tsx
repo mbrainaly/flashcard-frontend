@@ -8,7 +8,6 @@ import { IDeck } from '@/types/deck'
 const deckSchema = z.object({
   title: z.string().min(1, 'Title is required').max(100, 'Title cannot be more than 100 characters'),
   description: z.string().max(500, 'Description cannot be more than 500 characters').optional(),
-  isPublic: z.boolean().default(false),
   tags: z.array(z.string()).optional(),
 })
 
@@ -33,7 +32,6 @@ export default function DeckFormModal({ isOpen, onClose, onSubmit, deck }: DeckF
     defaultValues: {
       title: deck?.title || '',
       description: deck?.description || '',
-      isPublic: deck?.isPublic || false,
       tags: deck?.tags || [],
     },
   })
@@ -113,17 +111,6 @@ export default function DeckFormModal({ isOpen, onClose, onSubmit, deck }: DeckF
                     )}
                   </div>
 
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="isPublic"
-                      className="h-4 w-4 rounded border-accent-silver/10 bg-white/5 text-accent-neon focus:ring-accent-neon"
-                      {...register('isPublic')}
-                    />
-                    <label htmlFor="isPublic" className="ml-2 block text-sm text-accent-silver">
-                      Make this deck public
-                    </label>
-                  </div>
 
                   <div className="mt-6 flex justify-end gap-3">
                     <button
