@@ -16,6 +16,8 @@ import {
   CalendarIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
+import { showToast } from '@/components/ui/Toast'
 import Link from 'next/link'
 import StatsCard from '@/components/admin/analytics/StatsCard'
 import LineChart from '@/components/admin/analytics/LineChart'
@@ -66,9 +68,11 @@ interface BillingOverview {
 
 export default function BillingOverviewPage() {
   const { hasPermission } = useAdminAuth()
+  const adminApi = useAdminApi()
   const [billingData, setBillingData] = useState<BillingOverview | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [transactionsLoading, setTransactionsLoading] = useState(false)
   const [filters, setFilters] = useState({
     status: '',
     paymentMethod: '',
@@ -76,104 +80,113 @@ export default function BillingOverviewPage() {
     search: ''
   })
 
-  useEffect(() => {
-    const fetchBillingData = async () => {
-      try {
-        setLoading(true)
-        // Mock data for now
-        const mockTransactions: Transaction[] = [
-          {
-            _id: '1',
-            user: { name: 'John Doe', email: 'john@example.com' },
-            subscription: { plan: 'Pro', interval: 'monthly' },
-            amount: 19.99,
-            currency: 'USD',
-            status: 'succeeded',
-            paymentMethod: { type: 'card', last4: '4242', brand: 'Visa' },
-            stripeTransactionId: 'pi_1234567890',
-            createdAt: '2024-01-15T10:30:00Z',
-            processedAt: '2024-01-15T10:30:05Z'
-          },
-          {
-            _id: '2',
-            user: { name: 'Jane Smith', email: 'jane@example.com' },
-            subscription: { plan: 'Premium', interval: 'monthly' },
-            amount: 39.99,
-            currency: 'USD',
-            status: 'succeeded',
-            paymentMethod: { type: 'card', last4: '5555', brand: 'Mastercard' },
-            stripeTransactionId: 'pi_0987654321',
-            createdAt: '2024-01-14T15:45:00Z',
-            processedAt: '2024-01-14T15:45:03Z'
-          },
-          {
-            _id: '3',
-            user: { name: 'Bob Wilson', email: 'bob@example.com' },
-            subscription: { plan: 'Basic', interval: 'monthly' },
-            amount: 9.99,
-            currency: 'USD',
-            status: 'failed',
-            paymentMethod: { type: 'card', last4: '0000', brand: 'Visa' },
-            stripeTransactionId: 'pi_failed123',
-            failureReason: 'Your card was declined.',
-            createdAt: '2024-01-13T08:20:00Z'
-          },
-          {
-            _id: '4',
-            user: { name: 'Alice Johnson', email: 'alice@example.com' },
-            subscription: { plan: 'Pro', interval: 'yearly' },
-            amount: 199.99,
-            currency: 'USD',
-            status: 'succeeded',
-            paymentMethod: { type: 'paypal' },
-            stripeTransactionId: 'pi_paypal456',
-            createdAt: '2024-01-12T12:00:00Z',
-            processedAt: '2024-01-12T12:00:08Z'
-          },
-          {
-            _id: '5',
-            user: { name: 'Charlie Brown', email: 'charlie@example.com' },
-            subscription: { plan: 'Premium', interval: 'monthly' },
-            amount: 39.99,
-            currency: 'USD',
-            status: 'refunded',
-            paymentMethod: { type: 'card', last4: '1111', brand: 'American Express' },
-            stripeTransactionId: 'pi_refund789',
-            createdAt: '2024-01-11T16:30:00Z',
-            processedAt: '2024-01-11T16:30:02Z'
-          }
-        ]
-
-        const mockBillingData: BillingOverview = {
-          totalRevenue: 145678.90,
-          monthlyRecurringRevenue: 28456.78,
-          failedPayments: 234,
-          refundedAmount: 1234.56,
-          revenueGrowth: Array.from({ length: 30 }, (_, i) => ({
-            date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            revenue: Math.floor(Math.random() * 2000) + 800,
-            transactions: Math.floor(Math.random() * 50) + 20,
-            failed: Math.floor(Math.random() * 5) + 1
-          })),
-          paymentMethods: [
-            { method: 'Credit Card', count: 1234, amount: 98765.43 },
-            { method: 'PayPal', count: 456, amount: 32109.87 },
-            { method: 'Bank Transfer', count: 123, amount: 14803.60 }
-          ],
-          recentTransactions: mockTransactions
-        }
-
-        setTransactions(mockTransactions)
-        setBillingData(mockBillingData)
-      } catch (error) {
-        console.error('Error fetching billing data:', error)
-      } finally {
-        setLoading(false)
+  // Fetch billing overview data from API
+  const fetchBillingData = async () => {
+    try {
+      setLoading(true)
+      const response = await adminApi.get(`/api/admin/billing/overview?dateRange=${filters.dateRange}`)
+      
+      if (response.success) {
+        setBillingData(response.data)
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Error',
+          message: response.error || 'Failed to fetch billing data'
+        })
       }
+    } catch (error) {
+      console.error('Error fetching billing data:', error)
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to fetch billing data'
+      })
+    } finally {
+      setLoading(false)
     }
+  }
 
+  // Fetch transactions data from API
+  const fetchTransactions = async () => {
+    try {
+      setTransactionsLoading(true)
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams({
+        dateRange: filters.dateRange,
+        limit: '50' // Show more transactions in the detailed view
+      })
+
+      if (filters.status) queryParams.append('status', filters.status)
+      if (filters.paymentMethod) queryParams.append('paymentMethod', filters.paymentMethod)
+      if (filters.search) queryParams.append('search', filters.search)
+
+      const response = await adminApi.get(`/api/admin/billing/transactions?${queryParams}`)
+      
+      if (response.success) {
+        setTransactions(response.data || [])
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Error',
+          message: response.error || 'Failed to fetch transactions'
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching transactions:', error)
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to fetch transactions'
+      })
+    } finally {
+      setTransactionsLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchBillingData()
   }, [filters.dateRange])
+
+  useEffect(() => {
+    fetchTransactions()
+  }, [filters])
+
+  // Handle refund processing
+  const handleRefund = async (transactionId: string, amount: number, reason: string) => {
+    try {
+      const response = await adminApi.post('/api/admin/billing/refund', {
+        transactionId,
+        amount,
+        reason
+      })
+      
+      if (response.success) {
+        showToast({
+          type: 'success',
+          title: 'Success',
+          message: 'Refund processed successfully'
+        })
+        // Refresh data
+        fetchBillingData()
+        fetchTransactions()
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Error',
+          message: response.error || 'Failed to process refund'
+        })
+      }
+    } catch (error) {
+      console.error('Error processing refund:', error)
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to process refund'
+      })
+    }
+  }
 
   const getStatusBadge = (status: Transaction['status']) => {
     const statusConfig = {

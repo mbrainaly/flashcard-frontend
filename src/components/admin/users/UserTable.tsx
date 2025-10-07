@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import HighlightedText from '@/components/admin/HighlightedText'
 import {
   EyeIcon,
   PencilIcon,
@@ -49,6 +50,7 @@ interface UserTableProps {
   onItemsPerPageChange: (itemsPerPage: number) => void
   hasWritePermission: boolean
   hasDeletePermission: boolean
+  searchTerm?: string
 }
 
 export default function UserTable({
@@ -61,7 +63,8 @@ export default function UserTable({
   onPageChange,
   onItemsPerPageChange,
   hasWritePermission,
-  hasDeletePermission
+  hasDeletePermission,
+  searchTerm
 }: UserTableProps) {
   const [sortField, setSortField] = useState<keyof User>('createdAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
@@ -236,10 +239,10 @@ export default function UserTable({
                     </div>
                     <div className="ml-4">
                       <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {user.name}
+                        <HighlightedText text={user.name} searchTerm={searchTerm || ''} />
                       </div>
                       <div className="text-sm text-gray-500 dark:text-accent-silver">
-                        {user.email}
+                        <HighlightedText text={user.email} searchTerm={searchTerm || ''} />
                       </div>
                     </div>
                   </div>

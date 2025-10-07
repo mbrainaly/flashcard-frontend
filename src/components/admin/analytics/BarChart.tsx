@@ -44,15 +44,27 @@ export default function BarChart({
     const chartWidth = rect.width - padding.left - padding.right
     const chartHeight = height - padding.top - padding.bottom
 
-    // Get data ranges
-    const yValues = data.map(d => d[yKey])
+    // Get data ranges with validation
+    const yValues = data.map(d => {
+      const value = d[yKey]
+      return typeof value === 'number' && isFinite(value) ? value : 0
+    })
     const yMin = 0 // Start from 0 for bar charts
-    const yMax = Math.max(...yValues)
-    const yRange = yMax - yMin
+    const yMax = Math.max(...yValues, 1) // Ensure at least 1 to avoid division by zero
+    const yRange = yMax - yMin || 1 // Ensure non-zero range
+
+    // Validate chart dimensions
+    if (!isFinite(chartWidth) || !isFinite(chartHeight) || chartWidth <= 0 || chartHeight <= 0) {
+      console.warn('Invalid chart dimensions:', { chartWidth, chartHeight })
+      return
+    }
 
     // Helper functions
     const getX = (index: number) => padding.left + (index / data.length) * chartWidth
-    const getY = (value: number) => padding.top + chartHeight - ((value - yMin) / yRange) * chartHeight
+    const getY = (value: number) => {
+      const validValue = typeof value === 'number' && isFinite(value) ? value : 0
+      return padding.top + chartHeight - ((validValue - yMin) / yRange) * chartHeight
+    }
     const barWidth = chartWidth / data.length * 0.7
 
     // Draw grid
@@ -111,18 +123,27 @@ export default function BarChart({
       const y = getY(item[yKey])
       const barHeight = chartHeight - (y - padding.top)
 
-      // Create gradient
-      const gradient = ctx.createLinearGradient(0, y, 0, padding.top + chartHeight)
-      gradient.addColorStop(0, color)
-      gradient.addColorStop(1, color + '80') // Add transparency
+      // Validate coordinates before creating gradient
+      if (!isFinite(y) || !isFinite(chartHeight)) {
+        console.warn('Invalid gradient coordinates:', { y, chartHeight })
+        ctx.fillStyle = color
+      } else {
+        // Create gradient
+        const gradient = ctx.createLinearGradient(0, y, 0, padding.top + chartHeight)
+        gradient.addColorStop(0, color)
+        gradient.addColorStop(1, color + '80') // Add transparency
+        ctx.fillStyle = gradient
+      }
+      
+      // Validate all drawing parameters
+      if (isFinite(x) && isFinite(y) && isFinite(barWidth) && isFinite(barHeight)) {
+        ctx.fillRect(x, y, barWidth, barHeight)
 
-      ctx.fillStyle = gradient
-      ctx.fillRect(x, y, barWidth, barHeight)
-
-      // Add hover effect (simplified)
-      ctx.strokeStyle = color
-      ctx.lineWidth = 1
-      ctx.strokeRect(x, y, barWidth, barHeight)
+        // Add hover effect (simplified)
+        ctx.strokeStyle = color
+        ctx.lineWidth = 1
+        ctx.strokeRect(x, y, barWidth, barHeight)
+      }
 
       // Show values on bars
       if (showValues) {

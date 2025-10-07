@@ -18,7 +18,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
 import { useAdminApi } from '@/hooks/useAdminApi'
-import { useDebounce } from '@/hooks/useDebounce'
+import { useSmartSearch } from '@/hooks/useSmartSearch'
+import SmartSearchBar from '@/components/admin/SmartSearchBar'
 import { showToast } from '@/components/ui/Toast'
 import { TableRowSkeleton, StatsCardSkeleton } from '@/components/ui/Skeleton'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -72,6 +73,9 @@ export default function DecksManagementPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deckToDelete, setDeckToDelete] = useState<Deck | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [selectedDecks, setSelectedDecks] = useState<string[]>([])
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false)
 
   const [filters, setFilters] = useState<DeckFilters>({
     search: '',
@@ -230,6 +234,69 @@ export default function DecksManagementPage() {
     setCurrentPage(1)
   }
 
+  const handleSelectDeck = (deckId: string) => {
+    setSelectedDecks(prev =>
+      prev.includes(deckId)
+        ? prev.filter(id => id !== deckId)
+        : [...prev, deckId]
+    )
+  }
+
+  const handleSelectAll = () => {
+    if (selectedDecks.length === decks.length) {
+      setSelectedDecks([])
+    } else {
+      setSelectedDecks(decks.map(deck => deck._id))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedDecks.length === 0) return
+
+    try {
+      setBulkDeleteLoading(true)
+
+      // Delete decks one by one
+      const deletePromises = selectedDecks.map(deckId =>
+        adminApi.delete(`/api/admin/content/decks/${deckId}`)
+      )
+
+      const results = await Promise.all(deletePromises)
+      const successCount = results.filter(result => result.success).length
+      const failCount = results.length - successCount
+
+      if (successCount > 0) {
+        showToast({
+          type: 'success',
+          title: 'Bulk Delete Completed',
+          message: `${successCount} deck(s) deleted successfully${failCount > 0 ? `, ${failCount} failed` : ''}.`
+        })
+        // Refresh the decks list
+        fetchDecks()
+        // Clear selection
+        setSelectedDecks([])
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Bulk Delete Failed',
+          message: 'Failed to delete any decks. Please try again.'
+        })
+      }
+
+      // Close modal
+      setShowBulkDeleteModal(false)
+    } catch (error) {
+      console.error('Error in bulk delete:', error)
+      showToast({
+        type: 'error',
+        title: 'Bulk Delete Failed',
+        message: 'Failed to delete decks. Please try again.'
+      })
+    } finally {
+      setBulkDeleteLoading(false)
+    }
+  }
+
   // Pagination is handled by backend, so we use the decks directly
   const paginatedDecks = decks
 
@@ -370,14 +437,7 @@ export default function DecksManagementPage() {
           </div>
         </div>
 
-        {hasPermission('content.write') && (
-          <Link href="/admin/dashboard/content/decks/create">
-            <button className="inline-flex items-center px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors">
-              <PlusIcon className="w-5 h-5 mr-2" />
-              Create Deck
-            </button>
-          </Link>
-        )}
+        {/* Create button removed as requested */}
       </div>
 
       {/* Stats Cards */}
@@ -420,7 +480,7 @@ export default function DecksManagementPage() {
 
       {/* Search and Filters */}
       <div className="bg-white dark:bg-accent-obsidian rounded-xl p-6 shadow-sm border border-gray-200 dark:border-accent-silver/10">
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-center">
           {/* Search */}
           <div className="flex-1 relative">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -432,6 +492,17 @@ export default function DecksManagementPage() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-neon focus:border-transparent"
             />
           </div>
+
+          {/* Bulk Delete Button */}
+          {selectedDecks.length > 0 && (
+            <button
+              onClick={() => setShowBulkDeleteModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+            >
+              <TrashIcon className="w-5 h-5 mr-2" />
+              Delete Selected ({selectedDecks.length})
+            </button>
+          )}
 
           {/* Filter Toggle */}
           <button
@@ -498,6 +569,14 @@ export default function DecksManagementPage() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-accent-silver/10">
                 <thead className="bg-gray-50 dark:bg-accent-silver/5 sticky top-0 z-10">
                   <tr>
+                    <th className="px-6 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={selectedDecks.length === decks.length && decks.length > 0}
+                        onChange={handleSelectAll}
+                        className="h-4 w-4 text-accent-neon focus:ring-accent-neon border-gray-300 rounded"
+                      />
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-accent-silver uppercase tracking-wider">
                       Deck
                     </th>
@@ -530,6 +609,16 @@ export default function DecksManagementPage() {
                       transition={{ duration: 0.3, delay: index * 0.05 }}
                       className="hover:bg-gray-50 dark:hover:bg-accent-silver/5 transition-colors"
                     >
+                      {/* Checkbox */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedDecks.includes(deck._id)}
+                          onChange={() => handleSelectDeck(deck._id)}
+                          className="h-4 w-4 text-accent-neon focus:ring-accent-neon border-gray-300 rounded"
+                        />
+                      </td>
+
                       {/* Deck Info */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -808,6 +897,21 @@ export default function DecksManagementPage() {
         cancelText="Cancel"
         type="danger"
         loading={deleteLoading}
+      />
+
+      {/* Bulk Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showBulkDeleteModal}
+        onClose={() => {
+          setShowBulkDeleteModal(false)
+        }}
+        onConfirm={handleBulkDelete}
+        title="Bulk Delete Decks"
+        message={`Are you sure you want to delete ${selectedDecks.length} selected deck(s)? This action cannot be undone and will also delete all cards in these decks.`}
+        confirmText={`Delete ${selectedDecks.length} Deck(s)`}
+        cancelText="Cancel"
+        type="danger"
+        loading={bulkDeleteLoading}
       />
     </div>
   )

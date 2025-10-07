@@ -73,13 +73,58 @@ function BillingContent() {
     features: p.features,
   }))
 
+  // Helper function to get plan name from plan ID
+  const getPlanName = (planId: string): string => {
+    // First check database plans
+    const dbPlan = dbPlans?.find(p => p.id === planId)
+    if (dbPlan) {
+      return dbPlan.name === 'Basic' ? 'Free' : dbPlan.name
+    }
+    
+    // Fallback to hardcoded plan names
+    switch (planId) {
+      case 'basic':
+        return 'Free'
+      case 'pro':
+        return 'Pro'
+      case 'team':
+        return 'Enterprise'
+      default:
+        return 'Unknown'
+    }
+  }
+
+  // Helper function to get plan price from plan ID
+  const getPlanPrice = (planId: string): number => {
+    // First check database plans
+    const dbPlan = dbPlans?.find(p => p.id === planId)
+    if (dbPlan) {
+      return dbPlan.price
+    }
+    
+    // Fallback to hardcoded prices
+    switch (planId) {
+      case 'basic':
+        return 0
+      case 'pro':
+        return 15
+      case 'team':
+        return 49
+      default:
+        return 0
+    }
+  }
+
+  const currentPlanName = subscription ? getPlanName(subscription.plan) : 'Free'
+  const currentPlanPrice = subscription ? getPlanPrice(subscription.plan) : 0
+
   const billingHistory = [
     {
       id: '1',
       date: subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString() : new Date().toLocaleDateString(),
-      amount: subscription?.plan === 'basic' ? 0 : subscription?.plan === 'pro' ? 15 : 49,
-      status: `${subscription?.plan === 'basic' ? 'Free' : subscription?.plan === 'pro' ? 'Pro' : 'Enterprise'} Plan`,
-      description: `${subscription?.plan === 'basic' ? 'Free' : subscription?.plan === 'pro' ? 'Pro' : 'Enterprise'} Plan - Monthly`
+      amount: currentPlanPrice,
+      status: `${currentPlanName} Plan`,
+      description: `${currentPlanName} Plan - Monthly`
     }
   ]
 
@@ -89,23 +134,48 @@ function BillingContent() {
       setIsLoading(true)
       setMessage(null)
       
-      if (planId === 'basic') {
-        // Downgrade to basic plan (free)
-        await updateSubscription(planId)
-        setMessage({ type: 'success', text: 'Successfully downgraded to Free plan' })
-        // Refresh subscription data
-        fetchSubscription()
+      // Find the selected plan to check if it's free
+      const selectedPlan = plans.find(p => p.id === planId)
+      const isFree = selectedPlan?.monthlyPrice === 0
+      
+      if (planId === 'basic' || isFree) {
+        // Handle free plans directly
+        console.log(`Upgrading to free plan: ${planId}`)
+        
+        if (isFree) {
+          // For database plans with price = 0, use createCheckoutSession which will handle it directly
+          const response = await createCheckoutSession(planId)
+          
+          if (response.isFree) {
+            // Free plan was assigned directly
+            setMessage({ type: 'success', text: response.message || 'Successfully upgraded to free plan' })
+            // Refresh subscription data
+            fetchSubscription()
+          } else {
+            throw new Error('Unexpected response for free plan')
+          }
+        } else {
+          // Legacy basic plan handling
+          await updateSubscription(planId)
+          setMessage({ type: 'success', text: 'Successfully downgraded to Free plan' })
+          // Refresh subscription data
+          fetchSubscription()
+        }
       } else {
         // Create checkout session for paid plans
-        console.log(`Creating checkout session for plan: ${planId}`)
+        console.log(`Creating checkout session for paid plan: ${planId}`)
         
         try {
-          const { url } = await createCheckoutSession(planId)
+          const response = await createCheckoutSession(planId)
           
-          if (url) {
-            console.log(`Redirecting to checkout URL: ${url}`)
+          if (response.url) {
+            console.log(`Redirecting to checkout URL: ${response.url}`)
             // Redirect to Stripe Checkout
-            window.location.href = url
+            window.location.href = response.url
+          } else if (response.isFree) {
+            // This shouldn't happen for paid plans, but handle it just in case
+            setMessage({ type: 'success', text: response.message || 'Successfully upgraded plan' })
+            fetchSubscription()
           } else {
             throw new Error('No checkout URL returned from server')
           }
@@ -294,7 +364,7 @@ function BillingContent() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <p className="text-accent-silver">
-                  You are currently on the <span className="text-accent-neon font-medium">{subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)} Plan</span>
+                  You are currently on the <span className="text-accent-neon font-medium">{currentPlanName} Plan</span>
                 </p>
                 {subscription.currentPeriodEnd && (
                   <p className="text-sm text-accent-silver mt-1">

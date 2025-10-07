@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   BookOpenIcon,
   MagnifyingGlassIcon,
-  FunnelIcon,
   PlusIcon,
   EyeIcon,
   PencilIcon,
@@ -14,12 +13,16 @@ import {
   UserIcon,
   CalendarIcon,
   ClockIcon,
-  SparklesIcon,
   TagIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
+import { useDebounce } from '@/hooks/useDebounce'
+import { showToast } from '@/components/ui/Toast'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 interface Note {
@@ -50,164 +53,372 @@ interface Note {
 
 interface NoteFilters {
   search: string
-  category: string
-  status: string
-  author: string
-  dateRange: {
-    from: string
-    to: string
-  }
 }
+
+// Skeleton component for loading state
+const NotesTableSkeleton = () => (
+  <tbody className="bg-white dark:bg-accent-obsidian divide-y divide-gray-200 dark:divide-accent-silver/10">
+    {Array.from({ length: 10 }).map((_, index) => (
+      <tr key={index} className="animate-pulse">
+        {/* Checkbox */}
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="h-4 w-4 bg-accent-silver/10 rounded"></div>
+        </td>
+        
+        {/* Note */}
+        <td className="px-6 py-4">
+          <div className="space-y-2">
+            <div className="h-5 bg-accent-silver/10 rounded w-3/4"></div>
+            <div className="h-4 bg-accent-silver/10 rounded w-full"></div>
+            <div className="h-4 bg-accent-silver/10 rounded w-5/6"></div>
+          </div>
+        </td>
+        
+        {/* Author */}
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="flex items-center space-x-3">
+            <div className="h-8 w-8 bg-accent-silver/10 rounded-full"></div>
+            <div className="space-y-1">
+              <div className="h-4 bg-accent-silver/10 rounded w-24"></div>
+              <div className="h-3 bg-accent-silver/10 rounded w-32"></div>
+            </div>
+          </div>
+        </td>
+        
+        {/* Created */}
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="space-y-1">
+            <div className="h-4 bg-accent-silver/10 rounded w-20"></div>
+            <div className="h-3 bg-accent-silver/10 rounded w-16"></div>
+          </div>
+        </td>
+        
+        {/* Actions */}
+        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <div className="flex items-center justify-end space-x-2">
+            <div className="h-8 w-8 bg-accent-silver/10 rounded"></div>
+            <div className="h-8 w-8 bg-accent-silver/10 rounded"></div>
+            <div className="h-8 w-8 bg-accent-silver/10 rounded"></div>
+          </div>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+)
+
+// Stats cards skeleton
+const StatsCardsSkeleton = () => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {Array.from({ length: 2 }).map((_, index) => (
+      <div key={index} className="bg-white dark:bg-accent-obsidian rounded-xl p-6 shadow-sm border border-gray-200 dark:border-accent-silver/10 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-4 bg-accent-silver/10 rounded w-20"></div>
+            <div className="h-8 bg-accent-silver/10 rounded w-16"></div>
+          </div>
+          <div className="w-12 h-12 bg-accent-silver/10 rounded-lg"></div>
+        </div>
+      </div>
+    ))}
+  </div>
+)
+
+// Search and actions skeleton
+const SearchSkeleton = () => (
+  <div className="bg-white dark:bg-accent-obsidian rounded-xl p-6 shadow-sm border border-gray-200 dark:border-accent-silver/10 animate-pulse">
+    <div className="flex flex-col sm:flex-row gap-4 items-center">
+      <div className="flex-1 h-10 bg-accent-silver/10 rounded-lg"></div>
+      <div className="h-10 w-32 bg-accent-silver/10 rounded-lg"></div>
+    </div>
+  </div>
+)
+
+// Edit form skeleton
+const EditFormSkeleton = () => (
+  <div className="space-y-6 animate-pulse">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Title */}
+      <div>
+        <div className="h-4 bg-accent-silver/10 rounded w-20 mb-2"></div>
+        <div className="h-12 bg-accent-silver/10 rounded-lg"></div>
+      </div>
+      
+      {/* Category */}
+      <div>
+        <div className="h-4 bg-accent-silver/10 rounded w-16 mb-2"></div>
+        <div className="h-12 bg-accent-silver/10 rounded-lg"></div>
+      </div>
+    </div>
+
+    {/* Summary */}
+    <div>
+      <div className="h-4 bg-accent-silver/10 rounded w-16 mb-2"></div>
+      <div className="h-24 bg-accent-silver/10 rounded-lg"></div>
+    </div>
+
+    {/* Content */}
+    <div>
+      <div className="h-4 bg-accent-silver/10 rounded w-14 mb-2"></div>
+      <div className="h-64 bg-accent-silver/10 rounded-lg"></div>
+    </div>
+
+    {/* Tags */}
+    <div>
+      <div className="h-4 bg-accent-silver/10 rounded w-32 mb-2"></div>
+      <div className="h-12 bg-accent-silver/10 rounded-lg"></div>
+    </div>
+
+    {/* Buttons */}
+    <div className="flex justify-end space-x-3">
+      <div className="h-12 w-20 bg-accent-silver/10 rounded-lg"></div>
+      <div className="h-12 w-32 bg-accent-silver/10 rounded-lg"></div>
+    </div>
+  </div>
+)
 
 export default function NotesManagementPage() {
   const { hasPermission } = useAdminAuth()
+  const adminApi = useAdminApi()
+  const router = useRouter()
   const [notes, setNotes] = useState<Note[]>([])
-  const [filteredNotes, setFilteredNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showFilters, setShowFilters] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [totalNotes, setTotalNotes] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
-  const [showPreview, setShowPreview] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editLoading, setEditLoading] = useState(false)
+  const [loadingNoteDetails, setLoadingNoteDetails] = useState(false)
+  const [selectedNotes, setSelectedNotes] = useState<string[]>([])
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false)
 
   const [filters, setFilters] = useState<NoteFilters>({
-    search: '',
-    category: '',
-    status: '',
-    author: '',
-    dateRange: {
-      from: '',
-      to: ''
-    }
+    search: ''
   })
 
-  useEffect(() => {
-    const fetchNotes = async () => {
-      try {
-        setLoading(true)
-        // TODO: Replace with actual API call
-        // const response = await fetch('/api/admin/content/notes')
-        // const data = await response.json()
-        
-        // Mock data
-        const mockNotes: Note[] = Array.from({ length: 35 }, (_, i) => ({
-          _id: `note-${i + 1}`,
-          title: `Note ${i + 1}: ${[
-            'JavaScript ES6 Features Overview',
-            'React Hooks Deep Dive',
-            'Python Data Analysis Guide',
-            'Machine Learning Fundamentals',
-            'Database Design Principles'
-          ][i % 5]}`,
-          content: `This is a comprehensive note covering ${[
-            'modern JavaScript features including arrow functions, destructuring, and async/await patterns',
-            'React Hooks including useState, useEffect, useContext, and custom hooks with practical examples',
-            'Python libraries for data analysis including pandas, numpy, and matplotlib with code samples',
-            'machine learning concepts including supervised learning, unsupervised learning, and neural networks',
-            'database design principles including normalization, indexing, and query optimization techniques'
-          ][i % 5]}. The content includes detailed explanations, code examples, and best practices for implementation.`,
-          summary: `A detailed guide on ${[
-            'JavaScript ES6 features and modern development practices',
-            'React Hooks and state management patterns',
-            'Python data analysis tools and techniques',
-            'Machine learning algorithms and applications',
-            'Database design and optimization strategies'
-          ][i % 5]}.`,
-          author: {
-            name: ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Wilson', 'Alex Brown'][i % 5],
-            email: ['john@example.com', 'jane@example.com', 'mike@example.com', 'sarah@example.com', 'alex@example.com'][i % 5]
-          },
-          source: {
-            type: ['pdf', 'text', 'url', 'manual'][i % 4] as 'pdf' | 'text' | 'url' | 'manual',
-            name: [
-              'JavaScript_Guide.pdf',
-              'React_Documentation.txt',
-              'https://python-guide.org',
-              'Manual Entry'
-            ][i % 4]
-          },
-          category: ['Programming', 'Web Development', 'Data Science', 'Machine Learning', 'Database'][i % 5],
-          isActive: Math.random() > 0.1,
-          isPublic: Math.random() > 0.3,
-          wordCount: Math.floor(Math.random() * 2000) + 500,
-          readingTime: Math.floor(Math.random() * 15) + 3,
-          generatedAt: Math.random() > 0.3 ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : undefined,
-          viewCount: Math.floor(Math.random() * 500) + 10,
-          downloadCount: Math.floor(Math.random() * 100) + 5,
-          createdAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-          tags: ['study', 'reference', 'tutorial', 'guide', 'documentation'].slice(0, Math.floor(Math.random() * 3) + 1)
-        }))
-        
-        setNotes(mockNotes)
-        setFilteredNotes(mockNotes)
-      } catch (err) {
-        setError('Failed to fetch notes')
-        console.error('Error fetching notes:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
+  // Debounce search term
+  const debouncedSearchTerm = useDebounce(filters.search, 500)
 
+  const fetchNotes = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString()
+      })
+      
+      // Add search filter to query params
+      if (debouncedSearchTerm) queryParams.append('search', debouncedSearchTerm)
+
+      const response = await adminApi.get(`/api/admin/content/notes?${queryParams.toString()}`)
+      
+      if (response.success && response.data) {
+        setNotes(response.data)
+        setTotalNotes(response.pagination?.total || 0)
+        setTotalPages(response.pagination?.pages || 0)
+      } else {
+        throw new Error(response.error || 'Failed to fetch notes')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch notes')
+      console.error('Error fetching notes:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchNotes()
-  }, [])
+  }, [currentPage, itemsPerPage, debouncedSearchTerm])
 
-  // Apply filters
-  useEffect(() => {
-    let filtered = notes
-
-    if (filters.search) {
-      filtered = filtered.filter(note =>
-        note.title.toLowerCase().includes(filters.search.toLowerCase()) ||
-        note.content.toLowerCase().includes(filters.search.toLowerCase()) ||
-        note.summary.toLowerCase().includes(filters.search.toLowerCase()) ||
-        note.author.name.toLowerCase().includes(filters.search.toLowerCase())
-      )
-    }
-
-    if (filters.category) {
-      filtered = filtered.filter(note => note.category === filters.category)
-    }
-
-    if (filters.source) {
-      filtered = filtered.filter(note => note.source.type === filters.source)
-    }
-
-    if (filters.status) {
-      if (filters.status === 'active') {
-        filtered = filtered.filter(note => note.isActive)
-      } else if (filters.status === 'inactive') {
-        filtered = filtered.filter(note => !note.isActive)
-      } else if (filters.status === 'public') {
-        filtered = filtered.filter(note => note.isPublic)
-      } else if (filters.status === 'private') {
-        filtered = filtered.filter(note => !note.isPublic)
-      } else if (filters.status === 'generated') {
-        filtered = filtered.filter(note => note.generatedAt)
+  const fetchFullNoteForEdit = async (noteId: string) => {
+    try {
+      // Open modal instantly with loading state
+      setSelectedNote(null)
+      setShowEditModal(true)
+      setLoadingNoteDetails(true)
+      
+      const response = await adminApi.get(`/api/admin/content/notes/${noteId}`)
+      
+      if (response.success && response.data) {
+        // Backend returns { note: {...}, associatedQuizzes: [...] }
+        const { note: fullNote } = response.data
+        setSelectedNote(fullNote)
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Failed to Load Note',
+          message: response.error || 'Failed to load note details for editing.'
+        })
+        // Close modal on error
+        setShowEditModal(false)
       }
+    } catch (error) {
+      console.error('Error fetching note for edit:', error)
+      showToast({
+        type: 'error',
+        title: 'Failed to Load Note',
+        message: 'Failed to load note details for editing.'
+      })
+      // Close modal on error
+      setShowEditModal(false)
+    } finally {
+      setLoadingNoteDetails(false)
     }
+  }
 
-    setFilteredNotes(filtered)
-    setCurrentPage(1)
-  }, [filters, notes])
+  const handleEditNote = async (noteData: any) => {
+    if (!selectedNote) return
 
-  const handleNoteAction = (action: string, note: Note) => {
+    try {
+      setEditLoading(true)
+      const response = await adminApi.put(`/api/admin/content/notes/${selectedNote._id}`, {
+        title: noteData.title,
+        summary: noteData.summary,
+        content: noteData.content,
+        category: noteData.category,
+        tags: noteData.tags?.filter(Boolean) || []
+      })
+      
+      if (response.success) {
+        showToast({
+          type: 'success',
+          title: 'Note Updated',
+          message: 'Note has been updated successfully.'
+        })
+        // Refresh the notes list
+        fetchNotes()
+        // Close modal
+        setShowEditModal(false)
+        setSelectedNote(null)
+        setLoadingNoteDetails(false)
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Update Failed',
+          message: response.error || 'Failed to update note. Please try again.'
+        })
+      }
+    } catch (error) {
+      console.error('Error updating note:', error)
+      showToast({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Failed to update note. Please try again.'
+      })
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
+  const handleNoteAction = async (action: string, note: Note) => {
     switch (action) {
       case 'view':
-        setSelectedNote(note)
-        setShowPreview(true)
+        // Navigate to note details page
+        router.push(`/admin/dashboard/content/notes/${note._id}`)
         break
       case 'edit':
-        // TODO: Implement edit functionality
-        console.log('Edit note:', note._id)
+        // Fetch full note details for editing
+        await fetchFullNoteForEdit(note._id)
         break
       case 'delete':
         if (confirm(`Are you sure you want to delete "${note.title}"?`)) {
-          // TODO: Implement delete functionality
-          console.log('Delete note:', note._id)
+          try {
+            const response = await adminApi.delete(`/api/admin/content/notes/${note._id}`)
+            if (response.success) {
+              showToast({
+                type: 'success',
+                title: 'Note Deleted',
+                message: `"${note.title}" has been deleted successfully.`
+              })
+              // Refresh the notes list
+              fetchNotes()
+            } else {
+              showToast({
+                type: 'error',
+                title: 'Delete Failed',
+                message: response.error || 'Failed to delete note. Please try again.'
+              })
+            }
+          } catch (error) {
+            console.error('Error deleting note:', error)
+            showToast({
+              type: 'error',
+              title: 'Delete Failed',
+              message: 'Failed to delete note. Please try again.'
+            })
+          }
         }
         break
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedNotes.length === 0) return
+
+    try {
+      setBulkDeleteLoading(true)
+      
+      // Delete notes one by one (or implement bulk delete endpoint)
+      const deletePromises = selectedNotes.map(noteId => 
+        adminApi.delete(`/api/admin/content/notes/${noteId}`)
+      )
+      
+      const results = await Promise.all(deletePromises)
+      const successCount = results.filter(result => result.success).length
+      const failCount = results.length - successCount
+      
+      if (successCount > 0) {
+        showToast({
+          type: 'success',
+          title: 'Bulk Delete Completed',
+          message: `${successCount} note(s) deleted successfully${failCount > 0 ? `, ${failCount} failed` : ''}.`
+        })
+        // Refresh the notes list
+        fetchNotes()
+        // Clear selection
+        setSelectedNotes([])
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Bulk Delete Failed',
+          message: 'Failed to delete any notes. Please try again.'
+        })
+      }
+      
+      // Close modal
+      setShowBulkDeleteModal(false)
+    } catch (error) {
+      console.error('Error in bulk delete:', error)
+      showToast({
+        type: 'error',
+        title: 'Bulk Delete Failed',
+        message: 'Failed to delete notes. Please try again.'
+      })
+    } finally {
+      setBulkDeleteLoading(false)
+    }
+  }
+
+  const handleSelectNote = (noteId: string) => {
+    setSelectedNotes(prev => 
+      prev.includes(noteId) 
+        ? prev.filter(id => id !== noteId)
+        : [...prev, noteId]
+    )
+  }
+
+  const handleSelectAll = () => {
+    if (selectedNotes.length === notes.length) {
+      setSelectedNotes([])
+    } else {
+      setSelectedNotes(notes.map(note => note._id))
     }
   }
 
@@ -216,47 +427,9 @@ export default function NotesManagementPage() {
     setCurrentPage(1)
   }
 
-  // Pagination
-  const totalPages = Math.ceil(filteredNotes.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedNotes = filteredNotes.slice(startIndex, startIndex + itemsPerPage)
+  // Pagination is now handled server-side
+  const paginatedNotes = notes
 
-  const getSourceBadge = (source: Note['source']) => {
-    const baseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-    switch (source.type) {
-      case 'pdf':
-        return `${baseClasses} bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300`
-      case 'text':
-        return `${baseClasses} bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300`
-      case 'url':
-        return `${baseClasses} bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300`
-      case 'manual':
-        return `${baseClasses} bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-300`
-      default:
-        return `${baseClasses} bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300`
-    }
-  }
-
-  const getStatusBadge = (isActive: boolean, isPublic: boolean) => {
-    if (!isActive) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300">
-          <XCircleIcon className="w-3 h-3 mr-1" />
-          Inactive
-        </span>
-      )
-    }
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-        isPublic 
-          ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300'
-          : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300'
-      }`}>
-        <CheckCircleIcon className="w-3 h-3 mr-1" />
-        {isPublic ? 'Public' : 'Private'}
-      </span>
-    )
-  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -264,14 +437,6 @@ export default function NotesManagementPage() {
       month: 'short',
       day: 'numeric'
     })
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-neon"></div>
-      </div>
-    )
   }
 
   if (error) {
@@ -300,161 +465,84 @@ export default function NotesManagementPage() {
           </div>
         </div>
 
-        {hasPermission('content.write') && (
-          <Link href="/admin/dashboard/content/notes/create">
-            <button className="inline-flex items-center px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors">
-              <PlusIcon className="w-5 h-5 mr-2" />
-              Create Note
-            </button>
-          </Link>
-        )}
+        {/* Create button removed as requested */}
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[
-          { 
-            label: 'Total Notes', 
-            value: notes.length, 
-            color: 'orange', 
-            icon: BookOpenIcon 
-          },
-          { 
-            label: 'AI Generated', 
-            value: notes.filter(n => n.generatedAt).length, 
-            color: 'purple', 
-            icon: SparklesIcon 
-          },
-          { 
-            label: 'Total Views', 
-            value: notes.reduce((sum, n) => sum + n.viewCount, 0), 
-            color: 'blue', 
-            icon: EyeIcon 
-          },
-          { 
-            label: 'Downloads', 
-            value: notes.reduce((sum, n) => sum + n.downloadCount, 0), 
-            color: 'green', 
-            icon: DocumentTextIcon 
-          }
-        ].map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: index * 0.1 }}
-            className="bg-white dark:bg-accent-obsidian rounded-xl p-6 shadow-sm border border-gray-200 dark:border-accent-silver/10"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-accent-silver">
-                  {stat.label}
-                </p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
-                  {stat.value.toLocaleString()}
-                </p>
+      {loading ? (
+        <StatsCardsSkeleton />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[
+            {
+              label: 'Total Notes',
+              value: totalNotes,
+              color: 'orange',
+              icon: BookOpenIcon
+            },
+            {
+              label: 'Downloads',
+              value: notes.reduce((sum, n) => sum + n.downloadCount, 0),
+              color: 'green',
+              icon: DocumentTextIcon
+            }
+          ].map((stat, index) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              className="bg-white dark:bg-accent-obsidian rounded-xl p-6 shadow-sm border border-gray-200 dark:border-accent-silver/10"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-accent-silver">
+                    {stat.label}
+                  </p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
+                    {stat.value.toLocaleString()}
+                  </p>
+                </div>
+                <div className={`w-12 h-12 bg-${stat.color}-500 rounded-lg flex items-center justify-center`}>
+                  <stat.icon className="w-6 h-6 text-white" />
+                </div>
               </div>
-              <div className={`w-12 h-12 bg-${stat.color}-500 rounded-lg flex items-center justify-center`}>
-                <stat.icon className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Search and Filters */}
-      <div className="bg-white dark:bg-accent-obsidian rounded-xl p-6 shadow-sm border border-gray-200 dark:border-accent-silver/10">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1 relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search notes by title, content, or author..."
-              value={filters.search}
-              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-            />
-          </div>
-
-          {/* Filter Toggle */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`inline-flex items-center px-4 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg font-medium transition-colors ${
-              showFilters
-                ? 'bg-accent-neon text-black'
-                : 'bg-white dark:bg-accent-obsidian text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-accent-silver/10'
-            }`}
-          >
-            <FunnelIcon className="w-5 h-5 mr-2" />
-            Filters
-          </button>
+            </motion.div>
+          ))}
         </div>
+      )}
 
-        {/* Advanced Filters */}
-        {showFilters && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-4 pt-4 border-t border-gray-200 dark:border-accent-silver/10"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Category
-                </label>
-                <select
-                  value={filters.category}
-                  onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                >
-                  <option value="">All Categories</option>
-                  <option value="Programming">Programming</option>
-                  <option value="Web Development">Web Development</option>
-                  <option value="Data Science">Data Science</option>
-                  <option value="Machine Learning">Machine Learning</option>
-                  <option value="Database">Database</option>
-                </select>
-              </div>
-
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Status
-                </label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                >
-                  <option value="">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="public">Public</option>
-                  <option value="private">Private</option>
-                  <option value="generated">AI Generated</option>
-                </select>
-              </div>
-
-              <div className="flex items-end">
-                <button
-                  onClick={() => setFilters({
-                    search: '',
-                    category: '',
-                    status: '',
-                    author: '',
-                    dateRange: { from: '', to: '' }
-                  })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-accent-silver/10 transition-colors"
-                >
-                  Clear Filters
-                </button>
-              </div>
+      {/* Search and Bulk Actions */}
+      {loading ? (
+        <SearchSkeleton />
+      ) : (
+        <div className="bg-white dark:bg-accent-obsidian rounded-xl p-6 shadow-sm border border-gray-200 dark:border-accent-silver/10">
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
+            {/* Search */}
+            <div className="flex-1 relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search notes by title, content, or author..."
+                value={filters.search}
+                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+              />
             </div>
-          </motion.div>
-        )}
-      </div>
+
+            {/* Bulk Delete Button */}
+            {selectedNotes.length > 0 && (
+              <button
+                onClick={() => setShowBulkDeleteModal(true)}
+                className="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+              >
+                <TrashIcon className="w-5 h-5 mr-2" />
+                Delete Selected ({selectedNotes.length})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Notes Table */}
       <div className="bg-white dark:bg-accent-obsidian rounded-xl shadow-sm border border-gray-200 dark:border-accent-silver/10 flex flex-col" style={{ height: '600px' }}>
@@ -465,17 +553,19 @@ export default function NotesManagementPage() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-accent-silver/10">
                 <thead className="bg-gray-50 dark:bg-accent-silver/5 sticky top-0 z-10">
                   <tr>
+                    <th className="px-6 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={selectedNotes.length === notes.length && notes.length > 0}
+                        onChange={handleSelectAll}
+                        className="h-4 w-4 text-accent-neon focus:ring-accent-neon border-gray-300 rounded"
+                      />
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-accent-silver uppercase tracking-wider">
                       Note
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-accent-silver uppercase tracking-wider">
                       Author
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-accent-silver uppercase tracking-wider">
-                      Analytics
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-accent-silver uppercase tracking-wider">
-                      Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-accent-silver uppercase tracking-wider">
                       Created
@@ -485,8 +575,11 @@ export default function NotesManagementPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-accent-obsidian divide-y divide-gray-200 dark:divide-accent-silver/10">
-                  {paginatedNotes.map((note, index) => (
+                {loading ? (
+                  <NotesTableSkeleton />
+                ) : (
+                  <tbody className="bg-white dark:bg-accent-obsidian divide-y divide-gray-200 dark:divide-accent-silver/10">
+                    {paginatedNotes.map((note, index) => (
                     <motion.tr
                       key={note._id}
                       initial={{ opacity: 0, y: 20 }}
@@ -494,6 +587,16 @@ export default function NotesManagementPage() {
                       transition={{ duration: 0.3, delay: index * 0.05 }}
                       className="hover:bg-gray-50 dark:hover:bg-accent-silver/5 transition-colors"
                     >
+                      {/* Checkbox */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedNotes.includes(note._id)}
+                          onChange={() => handleSelectNote(note._id)}
+                          className="h-4 w-4 text-accent-neon focus:ring-accent-neon border-gray-300 rounded"
+                        />
+                      </td>
+
                       {/* Note Info */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -539,37 +642,6 @@ export default function NotesManagementPage() {
                         </div>
                       </td>
 
-
-                      {/* Analytics */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          <div className="flex items-center space-x-3 mb-1">
-                            <div className="flex items-center">
-                              <EyeIcon className="w-3 h-3 text-gray-400 mr-1" />
-                              <span className="text-xs">{note.viewCount}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <DocumentTextIcon className="w-3 h-3 text-gray-400 mr-1" />
-                              <span className="text-xs">{note.downloadCount}</span>
-                            </div>
-                          </div>
-                          {note.tags.length > 0 && (
-                            <div className="flex items-center">
-                              <TagIcon className="w-3 h-3 text-gray-400 mr-1" />
-                              <span className="text-xs text-gray-500 dark:text-accent-silver/70">
-                                {note.tags.slice(0, 2).join(', ')}
-                                {note.tags.length > 2 && '...'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(note.isActive, note.isPublic)}
-                      </td>
-
                       {/* Created Date */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center text-sm text-gray-500 dark:text-accent-silver">
@@ -611,14 +683,15 @@ export default function NotesManagementPage() {
                         </div>
                       </td>
                     </motion.tr>
-                  ))}
-                </tbody>
+                    ))}
+                  </tbody>
+                )}
               </table>
             </div>
           </div>
 
           {/* Enhanced Pagination - Fixed at bottom */}
-          {filteredNotes.length > 0 && (
+          {totalNotes > 0 && (
             <div className="flex-shrink-0 bg-white dark:bg-accent-obsidian px-4 py-4 border-t border-gray-200 dark:border-accent-silver/10">
               {/* Desktop Pagination */}
               <div className="flex items-center justify-between">
@@ -642,14 +715,14 @@ export default function NotesManagementPage() {
                   <div className="text-sm text-gray-700 dark:text-gray-300">
                     Showing{' '}
                     <span className="font-medium">
-                      {Math.min((currentPage - 1) * itemsPerPage + 1, filteredNotes.length)}
+                      {Math.min((currentPage - 1) * itemsPerPage + 1, totalNotes)}
                     </span>{' '}
                     to{' '}
                     <span className="font-medium">
-                      {Math.min(currentPage * itemsPerPage, filteredNotes.length)}
+                      {Math.min(currentPage * itemsPerPage, totalNotes)}
                     </span>{' '}
                     of{' '}
-                    <span className="font-medium">{filteredNotes.length}</span>{' '}
+                    <span className="font-medium">{totalNotes}</span>{' '}
                     results
                   </div>
                 </div>
@@ -684,77 +757,227 @@ export default function NotesManagementPage() {
         </div>
       </div>
 
-      {/* Note Preview Modal */}
-      {showPreview && selectedNote && (
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            {/* Background overlay */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm transition-opacity"
-              onClick={() => setShowPreview(false)}
-            />
-
-            {/* Modal */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="inline-block align-bottom bg-white dark:bg-accent-obsidian rounded-xl px-6 pt-6 pb-6 text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full relative z-10"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    {selectedNote.title}
+          <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm transition-opacity" onClick={() => setShowBulkDeleteModal(false)} />
+            
+            <div className="inline-block transform overflow-hidden rounded-xl bg-gradient-to-br from-accent-obsidian to-accent-obsidian/95 shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md sm:align-middle border border-accent-silver/20">
+              <div className="bg-gradient-to-r from-accent-obsidian to-accent-obsidian/90 px-6 py-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold text-white flex items-center">
+                    <TrashIcon className="w-6 h-6 mr-2 text-red-400" />
+                    Confirm Bulk Delete
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-accent-silver/70 mt-1">
-                    {selectedNote.summary}
+                  <button
+                    onClick={() => setShowBulkDeleteModal(false)}
+                    className="text-accent-silver hover:text-white transition-colors"
+                  >
+                    <XMarkIcon className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="mb-6">
+                  <p className="text-accent-silver/80 mb-4">
+                    Are you sure you want to delete <span className="font-semibold text-white">{selectedNotes.length}</span> selected note(s)?
+                  </p>
+                  <p className="text-sm text-red-400">
+                    This action cannot be undone. All associated quizzes will also be deleted.
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowPreview(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                >
-                  <XCircleIcon className="w-6 h-6" />
-                </button>
-              </div>
 
-              {/* Content */}
-              <div className="max-h-96 overflow-y-auto">
-                <div className="prose dark:prose-invert max-w-none">
-                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                    {selectedNote.content}
-                  </p>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setShowBulkDeleteModal(false)}
+                    className="px-6 py-3 border border-accent-silver/30 text-accent-silver/80 hover:bg-accent-silver/10 hover:text-white rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleteLoading}
+                    className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    {bulkDeleteLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Deleting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <TrashIcon className="w-4 h-4" />
+                        <span>Delete {selectedNotes.length} Note(s)</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-accent-silver/10">
-                <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-accent-silver/70">
-                  <span>{selectedNote.wordCount.toLocaleString()} words</span>
-                  <span>•</span>
-                  <span>{selectedNote.readingTime}min read</span>
-                  <span>•</span>
-                  <span>{selectedNote.viewCount} views</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  {selectedNote.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Edit Note Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm transition-opacity" onClick={() => {
+              setShowEditModal(false)
+              setSelectedNote(null)
+              setLoadingNoteDetails(false)
+            }} />
+            
+            <div className="inline-block transform overflow-hidden rounded-xl bg-gradient-to-br from-accent-obsidian to-accent-obsidian/95 shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:align-middle border border-accent-silver/20">
+              <div className="bg-gradient-to-r from-accent-obsidian to-accent-obsidian/90 px-6 py-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold text-white flex items-center">
+                    <PencilIcon className="w-6 h-6 mr-2 text-accent-neon" />
+                    Edit Note
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowEditModal(false)
+                      setSelectedNote(null)
+                      setLoadingNoteDetails(false)
+                    }}
+                    className="text-accent-silver hover:text-white transition-colors"
+                  >
+                    <XMarkIcon className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Loading state while fetching full note details */}
+                {loadingNoteDetails || !selectedNote ? (
+                  <EditFormSkeleton />
+                ) : (
+
+                <form onSubmit={async (e) => {
+                  e.preventDefault()
+                  const formData = new FormData(e.currentTarget)
+                  await handleEditNote({
+                    title: formData.get('title'),
+                    summary: formData.get('summary'),
+                    content: formData.get('content'),
+                    category: formData.get('category'),
+                    tags: formData.get('tags') ? formData.get('tags').toString().split(',').map(t => t.trim()) : []
+                  })
+                }} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Title */}
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-2">
+                        Note Title
+                      </label>
+                      <input
+                        name="title"
+                        type="text"
+                        defaultValue={selectedNote.title}
+                        className="w-full px-4 py-3 border border-accent-silver/20 rounded-lg bg-accent-silver/5 text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon transition-all"
+                        placeholder="Enter note title"
+                        required
+                      />
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-2">
+                        Category
+                      </label>
+                      <select
+                        name="category"
+                        defaultValue={selectedNote.category}
+                        className="w-full px-4 py-3 border border-accent-silver/20 rounded-lg bg-accent-silver/5 text-white focus:ring-2 focus:ring-accent-neon focus:border-accent-neon transition-all"
+                      >
+                        <option value="General" className="bg-accent-obsidian text-white">General</option>
+                        <option value="Programming" className="bg-accent-obsidian text-white">Programming</option>
+                        <option value="Web Development" className="bg-accent-obsidian text-white">Web Development</option>
+                        <option value="Data Science" className="bg-accent-obsidian text-white">Data Science</option>
+                        <option value="Machine Learning" className="bg-accent-obsidian text-white">Machine Learning</option>
+                        <option value="Database" className="bg-accent-obsidian text-white">Database</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div>
+                    <label className="block text-sm font-medium text-white mb-2">
+                      Summary
+                    </label>
+                    <textarea
+                      name="summary"
+                      defaultValue={selectedNote.summary}
+                      rows={2}
+                      className="w-full px-4 py-3 border border-accent-silver/20 rounded-lg bg-accent-silver/5 text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon transition-all resize-none"
+                      placeholder="Enter a brief summary"
+                    />
+                  </div>
+
+                  {/* Content */}
+                  <div>
+                    <label className="block text-sm font-medium text-white mb-2">
+                      Content
+                    </label>
+                    <textarea
+                      name="content"
+                      defaultValue={selectedNote.content}
+                      rows={8}
+                      className="w-full px-4 py-3 border border-accent-silver/20 rounded-lg bg-accent-silver/5 text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon transition-all resize-none"
+                      placeholder="Enter note content"
+                      required
+                    />
+                  </div>
+
+                  {/* Tags */}
+                  <div>
+                    <label className="block text-sm font-medium text-white mb-2">
+                      Tags (comma-separated)
+                    </label>
+                    <input
+                      name="tags"
+                      type="text"
+                      defaultValue={selectedNote.tags?.join(', ') || ''}
+                      className="w-full px-4 py-3 border border-accent-silver/20 rounded-lg bg-accent-silver/5 text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon transition-all"
+                      placeholder="Enter tags separated by commas"
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEditModal(false)
+                        setSelectedNote(null)
+                        setLoadingNoteDetails(false)
+                      }}
+                      className="px-6 py-3 border border-accent-silver/30 text-accent-silver/80 hover:bg-accent-silver/10 hover:text-white rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={editLoading}
+                      className="px-6 py-3 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                    >
+                      {editLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div>
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <span>Save Changes</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

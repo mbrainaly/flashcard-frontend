@@ -17,7 +17,9 @@ import {
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
 import { useAdminApi } from '@/hooks/useAdminApi'
 import { useRouter } from 'next/navigation'
-import { useDebounce } from '@/hooks/useDebounce'
+import { useSmartSearch } from '@/hooks/useSmartSearch'
+import SmartSearchBar from '@/components/admin/SmartSearchBar'
+import HighlightedText from '@/components/admin/HighlightedText'
 import UserTable from '@/components/admin/users/UserTable'
 import UserFilters from '@/components/admin/users/UserFilters'
 import UserModal from '@/components/admin/users/UserModal'
@@ -57,20 +59,15 @@ export default function UsersPage() {
   const { hasPermission } = useAdminAuth()
   const adminApi = useAdminApi()
   const router = useRouter()
-  const [users, setUsers] = useState<User[]>([])
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
+  const [allUsers, setAllUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showUserModal, setShowUserModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(10)
-  const [totalUsers, setTotalUsers] = useState(0)
-  const [totalPages, setTotalPages] = useState(0)
 
-  const [filters, setFilters] = useState<UserFilters>({
-    search: '',
+  const [additionalFilters, setAdditionalFilters] = useState<UserFilters>({
+    search: '', // Not used but required by interface
     role: '',
     status: '',
     subscription: '',
@@ -80,8 +77,31 @@ export default function UsersPage() {
     }
   })
 
-  // Debounce search to avoid excessive API calls
-  const debouncedSearchTerm = useDebounce(filters.search, 500)
+  // Smart search with real-time filtering
+  const {
+    searchTerm,
+    setSearchTerm,
+    filteredData: filteredUsers,
+    paginatedData: paginatedUsers,
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    itemsPerPage,
+    setItemsPerPage,
+    totalItems,
+    filteredCount,
+    getHighlightData,
+    resetSearch
+  } = useSmartSearch({
+    data: allUsers,
+    searchFields: ['name', 'email'],
+    filters: {
+      role: additionalFilters.role,
+      isActive: additionalFilters.status === 'active' ? true : additionalFilters.status === 'inactive' ? false : undefined,
+      'subscription.status': additionalFilters.subscription === 'subscribed' ? 'active' : additionalFilters.subscription === 'free' ? 'inactive' : undefined
+    },
+    itemsPerPage: 10
+  })
 
   // Fetch users from API
   const fetchUsers = async () => {
@@ -89,36 +109,11 @@ export default function UsersPage() {
       setLoading(true)
       setError(null)
       
-      // Build query parameters
-      const queryParams = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: itemsPerPage.toString()
-      })
-      
-        // Add filters to query params
-        if (debouncedSearchTerm) queryParams.append('search', debouncedSearchTerm)
-      if (filters.role) {
-        // Map frontend role to backend subscription plan
-        queryParams.append('subscriptionPlan', filters.role)
-      }
-      if (filters.status) {
-        if (filters.status === 'active') queryParams.append('isActive', 'true')
-        else if (filters.status === 'inactive') queryParams.append('isActive', 'false')
-      }
-      if (filters.subscription) {
-        if (filters.subscription === 'subscribed') queryParams.append('subscriptionStatus', 'active')
-        else if (filters.subscription === 'free') queryParams.append('subscriptionStatus', 'inactive')
-      }
-      if (filters.dateRange.from) queryParams.append('dateFrom', filters.dateRange.from)
-      if (filters.dateRange.to) queryParams.append('dateTo', filters.dateRange.to)
-
-      const response = await adminApi.get(`/api/admin/users?${queryParams.toString()}`)
+      // Fetch all users without pagination for client-side filtering
+      const response = await adminApi.get(`/api/admin/users?limit=1000`)
       
       if (response.success && response.data) {
-        setUsers(response.data)
-        setFilteredUsers(response.data)
-        setTotalUsers((response as any).pagination?.total || 0)
-        setTotalPages((response as any).pagination?.pages || 0)
+        setAllUsers(response.data)
       } else {
         throw new Error(response.error || 'Failed to fetch users')
       }
@@ -130,17 +125,10 @@ export default function UsersPage() {
     }
   }
 
-  // Memoize non-search filters to avoid unnecessary re-renders
-  const nonSearchFilters = useMemo(() => ({
-    role: filters.role,
-    status: filters.status,
-    subscription: filters.subscription,
-    dateRange: filters.dateRange
-  }), [filters.role, filters.status, filters.subscription, filters.dateRange])
-
+  // Fetch data only once on component mount
   useEffect(() => {
     fetchUsers()
-  }, [currentPage, itemsPerPage, debouncedSearchTerm, nonSearchFilters])
+  }, [])
 
   // Handle items per page change
   const handleItemsPerPageChange = (newItemsPerPage: number) => {
@@ -224,17 +212,16 @@ export default function UsersPage() {
     }
   }
 
-  // Pagination is handled by backend, so we use the users directly
-  const paginatedUsers = users
+  // Pagination is handled by smart search hook
   
 
-  // Stats - use totalUsers from API response for accurate count
+  // Stats - use filtered data for accurate count
   const stats = {
-    total: totalUsers,
-    active: users.filter(u => u.isActive).length,
-    pro: users.filter(u => u.role === 'pro').length,
-    team: users.filter(u => u.role === 'team').length,
-    inactive: users.filter(u => !u.isActive).length
+    total: totalItems,
+    active: filteredUsers.filter(u => u.isActive).length,
+    pro: filteredUsers.filter(u => u.role === 'pro').length,
+    team: filteredUsers.filter(u => u.role === 'team').length,
+    inactive: filteredUsers.filter(u => !u.isActive).length
   }
 
   if (loading) {
@@ -318,14 +305,14 @@ export default function UsersPage() {
       <div className="bg-white dark:bg-accent-obsidian rounded-xl p-6 shadow-sm border border-gray-200 dark:border-accent-silver/10">
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
-          <div className="flex-1 relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
+          <div className="flex-1">
+            <SmartSearchBar
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
               placeholder="Search users by name or email..."
-              value={filters.search}
-              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+              filteredCount={filteredCount}
+              totalCount={totalItems}
+              onReset={resetSearch}
             />
           </div>
 
@@ -351,7 +338,7 @@ export default function UsersPage() {
             exit={{ opacity: 0, height: 0 }}
             className="mt-4 pt-4 border-t border-gray-200 dark:border-accent-silver/10"
           >
-            <UserFilters filters={filters} onFiltersChange={setFilters} />
+            <UserFilters filters={additionalFilters} onFiltersChange={setAdditionalFilters} />
           </motion.div>
         )}
       </div>
@@ -363,12 +350,13 @@ export default function UsersPage() {
           onUserAction={handleUserAction}
           currentPage={currentPage}
           totalPages={totalPages}
-          totalUsers={totalUsers}
+          totalUsers={filteredCount}
           itemsPerPage={itemsPerPage}
           onPageChange={setCurrentPage}
           onItemsPerPageChange={handleItemsPerPageChange}
           hasWritePermission={hasPermission('users.write')}
           hasDeletePermission={hasPermission('users.delete')}
+          searchTerm={searchTerm}
         />
       </div>
 

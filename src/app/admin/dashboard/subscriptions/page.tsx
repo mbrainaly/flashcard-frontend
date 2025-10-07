@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   CreditCardIcon,
@@ -17,6 +17,10 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
+import { showToast } from '@/components/ui/Toast'
+import EditSubscriptionModal from '@/components/admin/EditSubscriptionModal'
+import HighlightedText from '@/components/admin/HighlightedText'
 import Link from 'next/link'
 import StatsCard from '@/components/admin/analytics/StatsCard'
 import LineChart from '@/components/admin/analytics/LineChart'
@@ -69,135 +73,193 @@ interface SubscriptionOverview {
 
 export default function SubscriptionsOverviewPage() {
   const { hasPermission } = useAdminAuth()
+  const adminApi = useAdminApi()
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [overview, setOverview] = useState<SubscriptionOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [totalSubscriptions, setTotalSubscriptions] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
   const [filters, setFilters] = useState({
     status: '',
     plan: '',
     search: ''
   })
+  
+  // Modal states
+  const [viewModalOpen, setViewModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null)
 
-  useEffect(() => {
-    const fetchSubscriptions = async () => {
-      try {
-        setLoading(true)
-        // Mock data for now
-        const mockSubscriptions: Subscription[] = [
-          {
-            _id: '1',
-            user: { name: 'John Doe', email: 'john@example.com' },
-            plan: { name: 'Pro', price: 19.99, interval: 'monthly', features: ['Unlimited decks', 'Advanced analytics'] },
-            status: 'active',
-            currentPeriodStart: '2024-01-01',
-            currentPeriodEnd: '2024-02-01',
-            cancelAtPeriodEnd: false,
-            createdAt: '2024-01-01',
-            lastPayment: { amount: 19.99, date: '2024-01-01', status: 'succeeded' }
-          },
-          {
-            _id: '2',
-            user: { name: 'Jane Smith', email: 'jane@example.com' },
-            plan: { name: 'Premium', price: 39.99, interval: 'monthly', features: ['Everything in Pro', 'Priority support'] },
-            status: 'active',
-            currentPeriodStart: '2024-01-15',
-            currentPeriodEnd: '2024-02-15',
-            cancelAtPeriodEnd: false,
-            createdAt: '2024-01-15',
-            lastPayment: { amount: 39.99, date: '2024-01-15', status: 'succeeded' }
-          },
-          {
-            _id: '3',
-            user: { name: 'Bob Wilson', email: 'bob@example.com' },
-            plan: { name: 'Basic', price: 9.99, interval: 'monthly', features: ['10 decks', 'Basic analytics'] },
-            status: 'past_due',
-            currentPeriodStart: '2024-01-10',
-            currentPeriodEnd: '2024-02-10',
-            cancelAtPeriodEnd: false,
-            createdAt: '2024-01-10',
-            lastPayment: { amount: 9.99, date: '2024-01-10', status: 'failed' }
-          },
-          {
-            _id: '4',
-            user: { name: 'Alice Johnson', email: 'alice@example.com' },
-            plan: { name: 'Pro', price: 199.99, interval: 'yearly', features: ['Unlimited decks', 'Advanced analytics'] },
-            status: 'trialing',
-            currentPeriodStart: '2024-01-20',
-            currentPeriodEnd: '2024-02-20',
-            cancelAtPeriodEnd: false,
-            trialEnd: '2024-02-03',
-            createdAt: '2024-01-20'
-          },
-          {
-            _id: '5',
-            user: { name: 'Charlie Brown', email: 'charlie@example.com' },
-            plan: { name: 'Premium', price: 39.99, interval: 'monthly', features: ['Everything in Pro', 'Priority support'] },
-            status: 'cancelled',
-            currentPeriodStart: '2024-01-05',
-            currentPeriodEnd: '2024-02-05',
-            cancelAtPeriodEnd: true,
-            createdAt: '2024-01-05',
-            lastPayment: { amount: 39.99, date: '2024-01-05', status: 'succeeded' }
-          },
-          // Additional mock subscriptions for pagination demo
-          ...Array.from({ length: 20 }, (_, i) => ({
-            _id: `${i + 6}`,
-            user: { 
-              name: `User ${i + 6}`, 
-              email: `user${i + 6}@example.com` 
-            },
-            plan: { 
-              name: ['Basic', 'Pro', 'Premium', 'Enterprise'][i % 4], 
-              price: [9.99, 19.99, 39.99, 99.99][i % 4], 
-              interval: Math.random() > 0.7 ? 'yearly' : 'monthly' as 'monthly' | 'yearly',
-              features: ['Sample features'] 
-            },
-            status: ['active', 'trialing', 'past_due', 'cancelled', 'incomplete'][i % 5] as 'active' | 'trialing' | 'past_due' | 'cancelled' | 'incomplete',
-            currentPeriodStart: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            currentPeriodEnd: new Date(Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            cancelAtPeriodEnd: Math.random() > 0.8,
-            createdAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            lastPayment: Math.random() > 0.2 ? {
-              amount: [9.99, 19.99, 39.99, 99.99][i % 4],
-              date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              status: ['succeeded', 'failed', 'pending'][Math.floor(Math.random() * 3)] as 'succeeded' | 'failed' | 'pending'
-            } : undefined
-          }))
-        ]
+  // Store all subscriptions for client-side filtering
+  const [allSubscriptions, setAllSubscriptions] = useState<Subscription[]>([])
+  
+  // Real-time client-side filtering
+  const filteredSubscriptions = useMemo(() => {
+    let filtered = allSubscriptions
 
-        const mockOverview: SubscriptionOverview = {
-          totalSubscriptions: 1247,
-          activeSubscriptions: 1089,
-          monthlyRevenue: 28456.78,
-          churnRate: 3.2,
-          subscriptionTrend: Array.from({ length: 30 }, (_, i) => ({
-            date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            active: Math.floor(Math.random() * 50) + 1000,
-            cancelled: Math.floor(Math.random() * 10) + 5,
-            new: Math.floor(Math.random() * 20) + 10
-          })),
-          planDistribution: [
-            { name: 'Basic', value: 456, color: '#3B82F6' },
-            { name: 'Pro', value: 678, color: '#10B981' },
-            { name: 'Premium', value: 234, color: '#F59E0B' },
-            { name: 'Enterprise', value: 89, color: '#8B5CF6' }
-          ],
-          recentSubscriptions: mockSubscriptions
-        }
-
-        setSubscriptions(mockSubscriptions)
-        setOverview(mockOverview)
-      } catch (error) {
-        console.error('Error fetching subscriptions:', error)
-      } finally {
-        setLoading(false)
-      }
+    // Apply search filter
+    if (filters.search.trim()) {
+      const searchTerm = filters.search.toLowerCase().trim()
+      filtered = filtered.filter(subscription => 
+        subscription.user.name.toLowerCase().includes(searchTerm) ||
+        subscription.user.email.toLowerCase().includes(searchTerm) ||
+        subscription.plan.name.toLowerCase().includes(searchTerm)
+      )
     }
 
+    // Apply status filter
+    if (filters.status) {
+      filtered = filtered.filter(subscription => subscription.status === filters.status)
+    }
+
+    // Apply plan filter
+    if (filters.plan) {
+      filtered = filtered.filter(subscription => subscription.plan.name === filters.plan)
+    }
+
+    return filtered
+  }, [allSubscriptions, filters.search, filters.status, filters.plan])
+
+  // Fetch subscriptions from API
+  const fetchSubscriptions = async () => {
+    try {
+      setLoading(true)
+      
+      // Fetch all subscriptions without pagination for client-side filtering
+      const response = await adminApi.get(`/api/admin/subscriptions?limit=1000`)
+      
+      if (response.success) {
+        setAllSubscriptions(response.data || [])
+        setTotalSubscriptions(response.data?.length || 0)
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Error',
+          message: response.error || 'Failed to fetch subscriptions'
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching subscriptions:', error)
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to fetch subscriptions'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch overview data from API
+  const fetchOverview = async () => {
+    try {
+      const response = await adminApi.get('/api/admin/subscriptions/overview')
+      
+      if (response.success) {
+        setOverview(response.data)
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Error',
+          message: response.error || 'Failed to fetch overview data'
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching overview:', error)
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to fetch overview data'
+      })
+    }
+  }
+
+  // Client-side pagination
+  const paginatedSubscriptions = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return filteredSubscriptions.slice(startIndex, endIndex)
+  }, [filteredSubscriptions, currentPage, itemsPerPage])
+
+  // Update total pages when filtered data changes
+  useEffect(() => {
+    const totalPages = Math.ceil(filteredSubscriptions.length / itemsPerPage)
+    setTotalPages(totalPages)
+    setTotalSubscriptions(filteredSubscriptions.length)
+    
+    // Reset to first page if current page is beyond available pages
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1)
+    }
+  }, [filteredSubscriptions.length, itemsPerPage, currentPage])
+
+  // Fetch data only once on component mount
+  useEffect(() => {
     fetchSubscriptions()
   }, [])
+
+  useEffect(() => {
+    fetchOverview()
+  }, [])
+
+  // Handle pagination changes
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage)
+    setCurrentPage(1)
+  }
+
+  // Action handlers
+  const handleViewSubscription = (subscription: Subscription) => {
+    setSelectedSubscription(subscription)
+    setViewModalOpen(true)
+  }
+
+  const handleEditSubscription = (subscription: Subscription) => {
+    setSelectedSubscription(subscription)
+    setEditModalOpen(true)
+  }
+
+  const handleDeleteSubscription = (subscription: Subscription) => {
+    setSelectedSubscription(subscription)
+    setDeleteModalOpen(true)
+  }
+
+  const confirmDeleteSubscription = async () => {
+    if (!selectedSubscription) return
+
+    try {
+      await adminApi.delete(`/api/admin/subscriptions/${selectedSubscription._id}`)
+      showToast('Subscription deleted successfully', 'success')
+      setDeleteModalOpen(false)
+      setSelectedSubscription(null)
+      fetchSubscriptions() // Refresh the list
+    } catch (error) {
+      console.error('Error deleting subscription:', error)
+      showToast('Failed to delete subscription', 'error')
+    }
+  }
+
+  const handleUpdateSubscription = async (updatedData: any) => {
+    if (!selectedSubscription) return
+
+    try {
+      await adminApi.put(`/api/admin/subscriptions/${selectedSubscription._id}`, updatedData)
+      showToast('Subscription updated successfully', 'success')
+      setEditModalOpen(false)
+      setSelectedSubscription(null)
+      fetchSubscriptions() // Refresh the list
+    } catch (error) {
+      console.error('Error updating subscription:', error)
+      showToast('Failed to update subscription', 'error')
+    }
+  }
 
   const getStatusBadge = (status: Subscription['status']) => {
     const statusConfig = {
@@ -219,24 +281,10 @@ export default function SubscriptionsOverviewPage() {
     )
   }
 
-  const filteredSubscriptions = subscriptions.filter(sub => {
-    if (filters.status && sub.status !== filters.status) return false
-    if (filters.plan && sub.plan.name !== filters.plan) return false
-    if (filters.search && !sub.user.name.toLowerCase().includes(filters.search.toLowerCase()) && 
-        !sub.user.email.toLowerCase().includes(filters.search.toLowerCase())) return false
-    return true
-  })
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredSubscriptions.length / itemsPerPage)
+  // Calculate pagination display info
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const paginatedSubscriptions = filteredSubscriptions.slice(startIndex, endIndex)
-
-  const handleItemsPerPageChange = (newItemsPerPage: number) => {
-    setItemsPerPage(newItemsPerPage)
-    setCurrentPage(1) // Reset to first page when changing items per page
-  }
+  const endIndex = Math.min(startIndex + itemsPerPage, totalSubscriptions)
 
   if (!hasPermission('subscriptions.read')) {
     return (
@@ -391,9 +439,17 @@ export default function SubscriptionsOverviewPage() {
               type="text"
               value={filters.search}
               onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              placeholder="Search by name or email..."
+              placeholder="Search by name, email, or plan..."
               className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
             />
+            {filters.search.trim() && (
+              <div className="mt-1 text-xs text-gray-500 dark:text-accent-silver/70">
+                {filteredSubscriptions.length} result{filteredSubscriptions.length !== 1 ? 's' : ''} found
+                {filteredSubscriptions.length !== allSubscriptions.length && (
+                  <span> out of {allSubscriptions.length} total</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
@@ -452,7 +508,7 @@ export default function SubscriptionsOverviewPage() {
       >
         <div className="px-6 py-4 border-b border-gray-200 dark:border-accent-silver/10">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Subscriptions ({filteredSubscriptions.length})
+            Subscriptions ({totalSubscriptions})
           </h3>
         </div>
         
@@ -497,17 +553,17 @@ export default function SubscriptionsOverviewPage() {
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {subscription.user.name}
+                              <HighlightedText text={subscription.user.name} searchTerm={filters.search} />
                             </div>
                             <div className="text-sm text-gray-500 dark:text-accent-silver">
-                              {subscription.user.email}
+                              <HighlightedText text={subscription.user.email} searchTerm={filters.search} />
                             </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {subscription.plan.name}
+                          <HighlightedText text={subscription.plan.name} searchTerm={filters.search} />
                         </div>
                         <div className="text-sm text-gray-500 dark:text-accent-silver">
                           ${subscription.plan.price}/{subscription.plan.interval}
@@ -540,15 +596,27 @@ export default function SubscriptionsOverviewPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center space-x-2">
-                          <button className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300">
+                          <button 
+                            onClick={() => handleViewSubscription(subscription)}
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
+                            title="View Details"
+                          >
                             <EyeIcon className="w-4 h-4" />
                           </button>
                           {hasPermission('subscriptions.write') && (
                             <>
-                              <button className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300">
+                              <button 
+                                onClick={() => handleEditSubscription(subscription)}
+                                className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300"
+                                title="Edit Subscription"
+                              >
                                 <PencilIcon className="w-4 h-4" />
                               </button>
-                              <button className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300">
+                              <button 
+                                onClick={() => handleDeleteSubscription(subscription)}
+                                className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                                title="Delete Subscription"
+                              >
                                 <TrashIcon className="w-4 h-4" />
                               </button>
                             </>
@@ -576,7 +644,7 @@ export default function SubscriptionsOverviewPage() {
           )}
 
           {/* Enhanced Pagination - Fixed at bottom */}
-          {filteredSubscriptions.length > 0 && (
+          {totalSubscriptions > 0 && (
             <div className="flex-shrink-0 bg-white dark:bg-accent-obsidian px-4 py-4 border-t border-gray-200 dark:border-accent-silver/10">
               {/* Mobile pagination */}
               <div className="flex items-center justify-between sm:hidden">
@@ -595,7 +663,7 @@ export default function SubscriptionsOverviewPage() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
                     className="px-3 py-1 text-sm font-medium text-gray-500 dark:text-accent-silver bg-white dark:bg-accent-obsidian border border-gray-300 dark:border-accent-silver/20 rounded-md hover:bg-gray-50 dark:hover:bg-accent-silver/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -605,7 +673,7 @@ export default function SubscriptionsOverviewPage() {
                     Page {currentPage} of {totalPages}
                   </span>
                   <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
                     className="px-3 py-1 text-sm font-medium text-gray-500 dark:text-accent-silver bg-white dark:bg-accent-obsidian border border-gray-300 dark:border-accent-silver/20 rounded-md hover:bg-gray-50 dark:hover:bg-accent-silver/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -632,20 +700,20 @@ export default function SubscriptionsOverviewPage() {
                     <span className="text-sm text-gray-700 dark:text-gray-300">entries</span>
                   </div>
                   <div className="text-sm text-gray-700 dark:text-gray-300">
-                    Showing {startIndex + 1} to {Math.min(endIndex, filteredSubscriptions.length)} of {filteredSubscriptions.length} results
+                    Showing {startIndex + 1} to {endIndex} of {totalSubscriptions} results
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => setCurrentPage(1)}
+                    onClick={() => handlePageChange(1)}
                     disabled={currentPage === 1}
                     className="px-3 py-1 text-sm font-medium text-gray-500 dark:text-accent-silver bg-white dark:bg-accent-obsidian border border-gray-300 dark:border-accent-silver/20 rounded-md hover:bg-gray-50 dark:hover:bg-accent-silver/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     First
                   </button>
                   <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
                     className="px-3 py-1 text-sm font-medium text-gray-500 dark:text-accent-silver bg-white dark:bg-accent-obsidian border border-gray-300 dark:border-accent-silver/20 rounded-md hover:bg-gray-50 dark:hover:bg-accent-silver/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -668,7 +736,7 @@ export default function SubscriptionsOverviewPage() {
                     return (
                       <button
                         key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
+                        onClick={() => handlePageChange(pageNum)}
                         className={`px-3 py-1 text-sm font-medium rounded-md ${
                           currentPage === pageNum
                             ? 'bg-accent-neon text-black'
@@ -681,14 +749,14 @@ export default function SubscriptionsOverviewPage() {
                   })}
 
                   <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
                     className="px-3 py-1 text-sm font-medium text-gray-500 dark:text-accent-silver bg-white dark:bg-accent-obsidian border border-gray-300 dark:border-accent-silver/20 rounded-md hover:bg-gray-50 dark:hover:bg-accent-silver/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
                   </button>
                   <button
-                    onClick={() => setCurrentPage(totalPages)}
+                    onClick={() => handlePageChange(totalPages)}
                     disabled={currentPage === totalPages}
                     className="px-3 py-1 text-sm font-medium text-gray-500 dark:text-accent-silver bg-white dark:bg-accent-obsidian border border-gray-300 dark:border-accent-silver/20 rounded-md hover:bg-gray-50 dark:hover:bg-accent-silver/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -700,6 +768,165 @@ export default function SubscriptionsOverviewPage() {
           )}
         </div>
       </motion.div>
+
+      {/* View Subscription Modal */}
+      {viewModalOpen && selectedSubscription && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white dark:bg-accent-obsidian rounded-xl shadow-2xl border border-gray-200 dark:border-accent-silver/10 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+          >
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-accent-silver/10">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Subscription Details
+              </h3>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* User Information */}
+              <div className="bg-accent-silver/5 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">User Information</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-accent-silver/70">Name</label>
+                    <p className="text-sm text-gray-900 dark:text-white">{selectedSubscription.user.name}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-accent-silver/70">Email</label>
+                    <p className="text-sm text-gray-900 dark:text-white">{selectedSubscription.user.email}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subscription Information */}
+              <div className="bg-accent-silver/5 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Subscription Information</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-accent-silver/70">Plan</label>
+                    <p className="text-sm text-gray-900 dark:text-white">{selectedSubscription.plan.name}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-accent-silver/70">Status</label>
+                    <div className="mt-1">
+                      {getStatusBadge(selectedSubscription.status)}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-accent-silver/70">Price</label>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      ${selectedSubscription.plan.price}/{selectedSubscription.plan.interval}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-accent-silver/70">Created</label>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {new Date(selectedSubscription.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-accent-silver/70">Current Period Start</label>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {new Date(selectedSubscription.currentPeriodStart).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-accent-silver/70">Current Period End</label>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {new Date(selectedSubscription.currentPeriodEnd).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Plan Features */}
+              {selectedSubscription.plan.features && selectedSubscription.plan.features.length > 0 && (
+                <div className="bg-accent-silver/5 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Plan Features</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {selectedSubscription.plan.features.map((feature, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <CheckCircleIcon className="w-4 h-4 text-green-500" />
+                        <span className="text-sm text-gray-700 dark:text-accent-silver">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-accent-silver/10 flex justify-end">
+              <button
+                onClick={() => setViewModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-accent-silver bg-white dark:bg-accent-silver/10 border border-gray-300 dark:border-accent-silver/20 rounded-lg hover:bg-gray-50 dark:hover:bg-accent-silver/20"
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Edit Subscription Modal */}
+      {editModalOpen && selectedSubscription && (
+        <EditSubscriptionModal
+          subscription={selectedSubscription}
+          onClose={() => setEditModalOpen(false)}
+          onUpdate={handleUpdateSubscription}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && selectedSubscription && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white dark:bg-accent-obsidian rounded-xl shadow-2xl border border-gray-200 dark:border-accent-silver/10 w-full max-w-md"
+          >
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-accent-silver/10">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Delete Subscription
+              </h3>
+            </div>
+            
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="flex-shrink-0">
+                  <ExclamationTriangleIcon className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    Are you sure you want to delete this subscription for{' '}
+                    <span className="font-medium">{selectedSubscription.user.name}</span>?
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-accent-silver/70 mt-1">
+                    This action cannot be undone and will immediately cancel their access.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-accent-silver/10 flex justify-end space-x-3">
+              <button
+                onClick={() => setDeleteModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-accent-silver bg-white dark:bg-accent-silver/10 border border-gray-300 dark:border-accent-silver/20 rounded-lg hover:bg-gray-50 dark:hover:bg-accent-silver/20"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteSubscription}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg"
+              >
+                Delete Subscription
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }

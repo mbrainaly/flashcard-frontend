@@ -15,8 +15,11 @@ export interface Subscription {
 }
 
 export interface CheckoutSession {
-  sessionId: string;
-  url: string;
+  sessionId?: string;
+  url?: string;
+  message?: string;
+  isFree?: boolean;
+  subscription?: any;
 }
 
 export interface Plan {
@@ -79,9 +82,13 @@ export const createCheckoutSession = async (planId: string): Promise<CheckoutSes
     const data = await response.json();
     console.log('Checkout session created:', data);
     
+    // Return the full response to handle both paid and free plans
     return {
       sessionId: data.sessionId,
       url: data.url,
+      message: data.message,
+      isFree: data.isFree,
+      subscription: data.subscription
     };
   } catch (error) {
     console.error('Error creating checkout session:', error);
