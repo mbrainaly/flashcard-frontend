@@ -59,49 +59,32 @@ export default function NotesListPage() {
     }
   }
 
-  // Fetch notes when session changes
+  // Fetch notes when session is ready (only once)
   useEffect(() => {
     if (session?.user?.accessToken) {
       fetchNotes()
     }
-  }, [session])
+  }, [session?.user?.accessToken]) // Only depend on accessToken, not entire session object
 
-  // Add event listeners for page visibility and focus
+  // Add event listeners for page visibility (less aggressive)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && session?.user?.accessToken) {
         fetchNotes()
       }
     }
 
-    const handleFocus = () => {
-      fetchNotes()
-    }
-
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('focus', handleFocus)
-    
-    // Initial fetch
-    fetchNotes()
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('focus', handleFocus)
     }
-  }, [])
-
-  // Refresh data periodically when the page is visible
-  useEffect(() => {
-    if (document.visibilityState === 'visible') {
-      const interval = setInterval(fetchNotes, 5000) // Refresh every 5 seconds when visible
-      return () => clearInterval(interval)
-    }
-  }, [])
+  }, [session?.user?.accessToken]) // Add dependency to avoid stale closure
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-accent-obsidian py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto flex items-center justify-center">
+        <div className="mx-auto max-w-7xl flex items-center justify-center">
           <LoadingSpinner />
         </div>
       </div>
@@ -120,7 +103,7 @@ export default function NotesListPage() {
       </div>
 
       <div className="relative">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-white">My Notes</h1>
             <Link href="/notes">

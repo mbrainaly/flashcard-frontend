@@ -28,7 +28,6 @@ const DEFAULT_STUDY_CONFIG: StudyConfigType = {
   cardDirection: 'front-to-back',
   dailyLimit: 20,
   showProgress: true,
-  enableSharing: false,
 }
 
 export default function StudySessionPage({ params }: StudySessionPageProps) {
@@ -51,6 +50,8 @@ export default function StudySessionPage({ params }: StudySessionPageProps) {
   const [isExplaining, setIsExplaining] = useState(false)
   const [explanation, setExplanation] = useState('')
   const [studyConfig, setStudyConfig] = useState<StudyConfigType>(DEFAULT_STUDY_CONFIG)
+  const [currentStudySessionId, setCurrentStudySessionId] = useState<string | null>(null)
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null)
 
   // Load saved config from localStorage on mount
   useEffect(() => {
@@ -73,11 +74,80 @@ export default function StudySessionPage({ params }: StudySessionPageProps) {
     localStorage.setItem(`study_config_${id}`, JSON.stringify(studyConfig))
   }, [studyConfig, id])
 
+  // Track when study session completes
+  useEffect(() => {
+    if (studyProgress.reviewed === cards.length && studyProgress.reviewed > 0 && currentStudySessionId) {
+      updateStudySession()
+    }
+  }, [studyProgress.reviewed, cards.length, currentStudySessionId])
+
   const handleConfigChange = (updates: Partial<StudyConfigType>) => {
     setStudyConfig(prev => ({
       ...prev,
       ...updates,
     }))
+  }
+
+  const createStudySession = async (sessionType: 'flashcard' | 'quiz' | 'exam') => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/study-sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.user?.accessToken}`,
+        },
+        body: JSON.stringify({
+          deckId: id,
+          sessionType,
+          studyMode: studyConfig
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setCurrentStudySessionId(data.data._id)
+        setSessionStartTime(new Date())
+        console.log('Study session created:', data.data._id)
+      }
+    } catch (error) {
+      console.error('Failed to create study session:', error)
+    }
+  }
+
+  const updateStudySession = async () => {
+    if (!currentStudySessionId || !sessionStartTime) return
+
+    try {
+      const duration = Math.round((Date.now() - sessionStartTime.getTime()) / 1000)
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/study-sessions/${currentStudySessionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.user?.accessToken}`,
+        },
+        body: JSON.stringify({
+          endTime: new Date(),
+          duration,
+          cardsStudied: studyProgress.reviewed,
+          correctAnswers,
+          totalAnswers: totalAnswered,
+          isCompleted: true,
+          performance: {
+            easyCards: 0,
+            mediumCards: 0,
+            hardCards: 0,
+            skippedCards: 0
+          }
+        }),
+      })
+
+      if (response.ok) {
+        console.log('Study session updated successfully')
+      }
+    } catch (error) {
+      console.error('Failed to update study session:', error)
+    }
   }
 
   const fetchDueCards = async () => {
@@ -163,6 +233,10 @@ export default function StudySessionPage({ params }: StudySessionPageProps) {
   const handleStartStudying = () => {
     setIsConfiguring(false)
     fetchDueCards()
+    
+    // Create study session based on selected mode
+    const sessionType = selectedMode === 'standard' ? 'flashcard' : selectedMode as 'quiz' | 'exam'
+    createStudySession(sessionType)
   }
 
   const handleStudyAgain = () => {

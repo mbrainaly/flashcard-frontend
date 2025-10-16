@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { DocumentIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import FeatureGate from '@/components/features/FeatureGate'
 
 interface DocumentUploadProps {
   onDocumentSubmit: (file: File) => void;
@@ -53,7 +54,8 @@ export default function DocumentUpload({ onDocumentSubmit }: DocumentUploadProps
   }
 
   return (
-    <div className="h-full">
+    <FeatureGate featureKey="document_upload">
+      <div className="h-full">
       {!file ? (
         <motion.div
           className={`h-full flex flex-col items-center justify-center rounded-xl border-2 border-dashed ${
@@ -106,6 +108,7 @@ export default function DocumentUpload({ onDocumentSubmit }: DocumentUploadProps
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </FeatureGate>
   )
 } 

@@ -4,8 +4,10 @@ import { useState, Suspense, lazy } from 'react'
 import { motion } from 'framer-motion'
 import { useSession } from 'next-auth/react'
 import NotesInputSelector from '@/components/notes/NotesInputSelector'
+import FeatureGate from '@/components/features/FeatureGate'
 import { fetchWithAuth } from '@/utils/fetchWithAuth'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import PlanLimitToast from '@/components/ui/PlanLimitToast'
 
 // Dynamically import the NotesEditor component to prevent server-side rendering issues
 const NotesEditor = lazy(() => import('@/components/notes/NotesEditor'))
@@ -15,6 +17,8 @@ export default function NotesGeneratorPage() {
   const [step, setStep] = useState<'input' | 'writing' | 'editing'>('input')
   const [generatedNotes, setGeneratedNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [planLimitError, setPlanLimitError] = useState<any>(null)
+  const [showPlanLimitToast, setShowPlanLimitToast] = useState(false)
 
   const handleContentSubmit = async (content: string, type: 'prompt' | 'content' | 'video', file?: File) => {
     try {
@@ -38,8 +42,22 @@ export default function NotesGeneratorPage() {
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to process PDF');
+          // Check if it's a plan limit error (403 status)
+          if (response.status === 403) {
+            try {
+              const errorData = await response.json();
+              setPlanLimitError(errorData);
+              setShowPlanLimitToast(true);
+              setStep('input');
+              return;
+            } catch (parseError) {
+              // If JSON parsing fails, treat as regular error
+              throw new Error('Failed to process PDF');
+            }
+          } else {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Failed to process PDF');
+          }
         }
 
         const data = await response.json();
@@ -71,6 +89,22 @@ export default function NotesGeneratorPage() {
 
       // If the response is not ok, try to parse it as JSON for error details
       if (!response.ok) {
+        // Check if it's a plan limit error (403 status)
+        if (response.status === 403) {
+          try {
+            if (responseText) {
+              const errorData = JSON.parse(responseText);
+              setPlanLimitError(errorData);
+              setShowPlanLimitToast(true);
+              setStep('input');
+              return;
+            }
+          } catch (parseError) {
+            // If JSON parsing fails, treat as regular error
+            throw new Error('Failed to generate notes');
+          }
+        }
+        
         let errorMessage = `Server error: ${response.status}`;
         try {
           if (responseText) {
@@ -140,7 +174,8 @@ export default function NotesGeneratorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-accent-obsidian">
+    <FeatureGate featureKey="ai_notes_generation">
+      <div className="min-h-screen bg-accent-obsidian">
       {/* Gradient background */}
       <div className="absolute inset-0 bg-gradient-radial from-accent-neon/10 via-transparent to-transparent" />
       
@@ -151,7 +186,7 @@ export default function NotesGeneratorPage() {
       </div>
 
       <div className="relative">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -198,6 +233,17 @@ export default function NotesGeneratorPage() {
           </motion.div>
         </div>
       </div>
+
+      {/* Plan Limit Toast */}
+      <PlanLimitToast
+        error={planLimitError}
+        isVisible={showPlanLimitToast}
+        onClose={() => {
+          setShowPlanLimitToast(false)
+          setPlanLimitError(null)
+        }}
+      />
     </div>
+    </FeatureGate>
   )
 } 

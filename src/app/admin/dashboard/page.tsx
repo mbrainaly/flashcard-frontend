@@ -15,6 +15,7 @@ import {
   AcademicCapIcon,
   NewspaperIcon
 } from '@heroicons/react/24/outline'
+import { useAdminApi } from '@/hooks/useAdminApi'
 
 interface MetricCard {
   title: string
@@ -48,93 +49,161 @@ export default function AdminDashboard() {
     status: 'healthy',
     uptime: '99.9%',
     responseTime: '125ms',
-    activeUsers: 1247
+    activeUsers: 0
   })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  const { get } = useAdminApi()
 
-  // Mock data - in real app, this would come from API
+  // Fetch dashboard data from API
   useEffect(() => {
-    setMetrics([
-      {
-        title: 'Total Users',
-        value: '12,847',
-        change: 12.5,
-        changeType: 'increase',
-        icon: UsersIcon,
-        color: 'bg-blue-500'
-      },
-      {
-        title: 'Active Decks',
-        value: '3,254',
-        change: 8.2,
-        changeType: 'increase',
-        icon: DocumentDuplicateIcon,
-        color: 'bg-green-500'
-      },
-      {
-        title: 'Monthly Revenue',
-        value: '$24,890',
-        change: 15.3,
-        changeType: 'increase',
-        icon: CreditCardIcon,
-        color: 'bg-purple-500'
-      },
-      {
-        title: 'Study Sessions',
-        value: '45,123',
-        change: -2.1,
-        changeType: 'decrease',
-        icon: AcademicCapIcon,
-        color: 'bg-orange-500'
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        // Fetch dashboard stats and recent activity in parallel
+        const [statsResponse, activityResponse] = await Promise.all([
+          get('/api/admin/analytics/dashboard'),
+          get('/api/admin/analytics/activity?limit=5')
+        ])
+        
+        if (statsResponse.success && activityResponse.success) {
+          const stats = statsResponse.data
+          
+          // Transform backend data to frontend format
+          const transformedMetrics: MetricCard[] = [
+            {
+              title: 'Total Users',
+              value: stats.overview.totalUsers.toLocaleString(),
+              change: stats.overview.userGrowth || 0,
+              changeType: (stats.overview.userGrowth || 0) >= 0 ? 'increase' : 'decrease',
+              icon: UsersIcon,
+              color: 'bg-blue-500'
+            },
+            {
+              title: 'Active Decks',
+              value: stats.content.totalDecks.toLocaleString(),
+              change: 8.2, // This could be calculated from historical data
+              changeType: 'increase',
+              icon: DocumentDuplicateIcon,
+              color: 'bg-green-500'
+            },
+            {
+              title: 'Monthly Revenue',
+              value: `$${(stats.overview.periodRevenue / 100).toLocaleString()}`,
+              change: stats.overview.revenueGrowth || 0,
+              changeType: (stats.overview.revenueGrowth || 0) >= 0 ? 'increase' : 'decrease',
+              icon: CreditCardIcon,
+              color: 'bg-purple-500'
+            },
+            {
+              title: 'Total Content',
+              value: stats.overview.totalContent.toLocaleString(),
+              change: 5.1, // This could be calculated from historical data
+              changeType: 'increase',
+              icon: AcademicCapIcon,
+              color: 'bg-orange-500'
+            }
+          ]
+          
+          setMetrics(transformedMetrics)
+          setRecentActivity(activityResponse.data)
+          setSystemHealth(prev => ({
+            ...prev,
+            activeUsers: stats.overview.activeUsers
+          }))
+        } else {
+          setError('Failed to fetch dashboard data')
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err)
+        setError('Failed to load dashboard data')
+      } finally {
+        setLoading(false)
       }
-    ])
+    }
 
-    setRecentActivity([
-      {
-        id: '1',
-        type: 'user',
-        message: 'New user registration: john.doe@email.com',
-        timestamp: '2 minutes ago',
-        user: 'System'
-      },
-      {
-        id: '2',
-        type: 'content',
-        message: 'New deck created: "Advanced JavaScript Concepts"',
-        timestamp: '15 minutes ago',
-        user: 'Sarah Wilson'
-      },
-      {
-        id: '3',
-        type: 'subscription',
-        message: 'Premium subscription activated',
-        timestamp: '1 hour ago',
-        user: 'Mike Johnson'
-      },
-      {
-        id: '4',
-        type: 'content',
-        message: 'Quiz completed: "React Fundamentals"',
-        timestamp: '2 hours ago',
-        user: 'Emily Davis'
-      },
-      {
-        id: '5',
-        type: 'system',
-        message: 'Database backup completed successfully',
-        timestamp: '3 hours ago',
-        user: 'System'
-      }
-    ])
+    fetchDashboardData()
   }, [])
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        {/* Loading skeleton for metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, index) => (
+            <div key={index} className="bg-white dark:bg-accent-obsidian rounded-xl p-6 shadow-sm border border-gray-200 dark:border-accent-silver/10 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-200 dark:bg-accent-silver/20 rounded w-24 mb-3"></div>
+                  <div className="h-8 bg-gray-200 dark:bg-accent-silver/20 rounded w-16 mb-2"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-accent-silver/20 rounded w-20"></div>
+                </div>
+                <div className="w-12 h-12 bg-gray-200 dark:bg-accent-silver/20 rounded-lg"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Loading skeleton for activity */}
+          <div className="lg:col-span-2 bg-white dark:bg-accent-obsidian rounded-xl p-6 shadow-sm border border-gray-200 dark:border-accent-silver/10 animate-pulse">
+            <div className="h-6 bg-gray-200 dark:bg-accent-silver/20 rounded w-32 mb-6"></div>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, index) => (
+                <div key={index} className="flex items-start space-x-3">
+                  <div className="w-8 h-8 bg-gray-200 dark:bg-accent-silver/20 rounded-full"></div>
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 dark:bg-accent-silver/20 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-gray-200 dark:bg-accent-silver/20 rounded w-1/2"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Loading skeleton for system health */}
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-accent-obsidian rounded-xl p-6 shadow-sm border border-gray-200 dark:border-accent-silver/10 animate-pulse">
+              <div className="h-6 bg-gray-200 dark:bg-accent-silver/20 rounded w-28 mb-4"></div>
+              <div className="space-y-4">
+                {[...Array(4)].map((_, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="h-4 bg-gray-200 dark:bg-accent-silver/20 rounded w-16"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-accent-silver/20 rounded w-12"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="text-red-500 text-lg font-medium mb-2">Error Loading Dashboard</div>
+          <div className="text-gray-600 dark:text-accent-silver mb-4">{error}</div>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-accent-neon hover:bg-accent-neon/90 text-black font-medium px-4 py-2 rounded-lg"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+
   const quickActions: QuickAction[] = [
-    {
-      title: 'Create New Deck',
-      description: 'Add a new flashcard deck to the system',
-      icon: DocumentDuplicateIcon,
-      href: '/admin/dashboard/content/decks/create',
-      color: 'bg-blue-500 hover:bg-blue-600'
-    },
     {
       title: 'Add Blog Post',
       description: 'Create a new blog post',
@@ -242,9 +311,6 @@ export default function AdminDashboard() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Recent Activity
             </h3>
-            <button className="text-sm text-blue-600 dark:text-accent-neon hover:text-blue-700 dark:hover:text-accent-neon/80 font-medium">
-              View all
-            </button>
           </div>
           
           <div className="space-y-4">

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { LinkIcon } from '@heroicons/react/24/outline'
+import FeatureGate from '@/components/features/FeatureGate'
 
 interface URLInputProps {
   onSubmit: (url: string) => void
@@ -54,7 +55,8 @@ export default function URLInput({ onSubmit }: URLInputProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="h-full flex flex-col">
+    <FeatureGate featureKey="youtube_analysis">
+      <form onSubmit={handleSubmit} className="h-full flex flex-col">
       <div className="relative flex-1">
         <input
           type="text"
@@ -83,6 +85,7 @@ export default function URLInput({ onSubmit }: URLInputProps) {
       >
         Analyze URL
       </motion.button>
-    </form>
+      </form>
+    </FeatureGate>
   )
 } 

@@ -11,6 +11,7 @@ export interface Subscription {
     name: string;
     price: number;
     features: string[];
+    selectedFeatures?: string[];
   };
 }
 
@@ -34,6 +35,7 @@ export interface Plan {
   monthlyQuizLimit: number | null;
   monthlyNotesLimit: number | null;
   features: string[];
+  isPopular?: boolean;
 }
 
 /**
@@ -127,6 +129,13 @@ export const updateSubscription = async (planId: string): Promise<Subscription> 
 
 export const getPlans = async (): Promise<Plan[]> => {
   const response = await fetchWithAuth('/api/subscription/plans');
+  const data = await response.json();
+  if (!data.success) throw new Error('Failed to load plans');
+  return data.plans as Plan[];
+}
+
+export const getPublicPlans = async (): Promise<Plan[]> => {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/subscription/plans`);
   const data = await response.json();
   if (!data.success) throw new Error('Failed to load plans');
   return data.plans as Plan[];

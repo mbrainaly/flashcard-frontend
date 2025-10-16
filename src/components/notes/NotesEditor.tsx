@@ -17,7 +17,17 @@ interface NotesEditorProps {
 export default function NotesEditor({ content: initialContent, onSave }: NotesEditorProps) {
   const { data: session } = useSession()
   const router = useRouter()
-  const [title, setTitle] = useState('Untitled Notes')
+  const [title, setTitle] = useState(() => {
+    const now = new Date();
+    const timestamp = now.toLocaleString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+    return `Notes - ${timestamp}`;
+  })
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)

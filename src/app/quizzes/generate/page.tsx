@@ -6,7 +6,10 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import QuizGenerator from '@/components/quiz/QuizGenerator'
 import QuizConfigForm, { QuizConfig } from '@/components/quiz/QuizConfigForm'
+import FeatureGate from '@/components/features/FeatureGate'
 import { fetchWithAuth } from '@/utils/fetchWithAuth'
+import PlanLimitToast from '@/components/ui/PlanLimitToast'
+import { usePlanLimitError } from '@/hooks/usePlanLimitError'
 
 type GenerationStep = 'input' | 'config' | 'generating'
 
@@ -24,6 +27,7 @@ export default function QuizGenerationPage() {
   const [step, setStep] = useState<GenerationStep>('input')
   const [analysis, setAnalysis] = useState<ContentAnalysis | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { planLimitError, showPlanLimitToast, checkAndHandlePlanLimitError, clearPlanLimitError } = usePlanLimitError()
 
   const handleAnalysisComplete = (results: ContentAnalysis) => {
     setAnalysis(results)
@@ -44,6 +48,12 @@ export default function QuizGenerationPage() {
       })
 
       if (!response.ok) {
+        // Check if it's a plan limit error
+        const isPlanLimitError = await checkAndHandlePlanLimitError(response)
+        if (isPlanLimitError) {
+          setStep('config')
+          return
+        }
         throw new Error('Failed to create quiz')
       }
 
@@ -57,8 +67,9 @@ export default function QuizGenerationPage() {
   }
 
   return (
-    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+    <FeatureGate featureKey="ai_quiz_generation">
+      <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -121,7 +132,15 @@ export default function QuizGenerationPage() {
             {error}
           </motion.div>
         )}
+
+        {/* Plan Limit Toast */}
+        <PlanLimitToast
+          error={planLimitError}
+          isVisible={showPlanLimitToast}
+          onClose={clearPlanLimitError}
+        />
+        </div>
       </div>
-    </div>
+    </FeatureGate>
   )
 } 

@@ -13,6 +13,7 @@ import {
   ScaleIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
 import Link from 'next/link'
 
 interface TermsPageData {
@@ -40,9 +41,11 @@ interface TermsPageData {
 
 export default function TermsOfServicePage() {
   const { hasPermission } = useAdminAuth()
+  const { get, put } = useAdminApi()
   const [pageData, setPageData] = useState<TermsPageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'content' | 'seo' | 'settings'>('content')
   const [previewMode, setPreviewMode] = useState(false)
 
@@ -50,166 +53,35 @@ export default function TermsOfServicePage() {
     const fetchPageData = async () => {
       try {
         setLoading(true)
-        // Mock data for now
-        const mockData: TermsPageData = {
-          _id: '2',
-          title: 'Terms of Service',
-          slug: 'terms',
-          content: `# Terms of Service
-
-## Acceptance of Terms
-
-By accessing and using FlashCard App, you accept and agree to be bound by the terms and provision of this agreement.
-
-## Description of Service
-
-FlashCard App is a digital learning platform that provides flashcard creation, study tools, and spaced repetition algorithms to enhance learning and memory retention.
-
-## User Accounts
-
-### Account Creation
-- You must provide accurate and complete information when creating an account
-- You are responsible for maintaining the confidentiality of your account credentials
-- You must notify us immediately of any unauthorized use of your account
-
-### Account Responsibilities
-- You are solely responsible for all activities that occur under your account
-- You must not share your account with others
-- You must keep your contact information up to date
-
-## Acceptable Use Policy
-
-You agree not to use the service to:
-- Violate any applicable laws or regulations
-- Infringe on intellectual property rights
-- Upload malicious content or spam
-- Attempt to gain unauthorized access to our systems
-- Interfere with the proper functioning of the service
-
-## Subscription and Payment Terms
-
-### Premium Subscriptions
-- Subscription fees are billed in advance on a monthly or annual basis
-- All fees are non-refundable except as required by law
-- We reserve the right to change subscription prices with 30 days notice
-
-### Free Trial
-- Free trials are available for new users only
-- Trials automatically convert to paid subscriptions unless cancelled
-- You may cancel your trial at any time before it expires
-
-## Intellectual Property Rights
-
-### Your Content
-- You retain ownership of the content you create using our service
-- You grant us a license to use your content to provide and improve our service
-- You are responsible for ensuring you have the right to use any content you upload
-
-### Our Content
-- FlashCard App and its original content are protected by copyright and other intellectual property laws
-- You may not reproduce, distribute, or create derivative works without permission
-
-## Privacy and Data Protection
-
-Your privacy is important to us. Please review our Privacy Policy to understand how we collect, use, and protect your information.
-
-## Service Availability
-
-### Uptime
-- We strive to maintain high service availability but do not guarantee 100% uptime
-- Scheduled maintenance will be announced in advance when possible
-- We are not liable for service interruptions beyond our control
-
-### Service Changes
-- We reserve the right to modify or discontinue features with reasonable notice
-- We will provide migration tools when possible for discontinued features
-
-## Limitation of Liability
-
-To the maximum extent permitted by law:
-- Our liability is limited to the amount you paid for the service in the past 12 months
-- We are not liable for indirect, incidental, or consequential damages
-- Some jurisdictions do not allow liability limitations, so these may not apply to you
-
-## Indemnification
-
-You agree to indemnify and hold harmless FlashCard App from any claims, damages, or expenses arising from your use of the service or violation of these terms.
-
-## Termination
-
-### By You
-- You may terminate your account at any time through your account settings
-- Upon termination, your access to the service will cease immediately
-- You may request deletion of your data in accordance with our Privacy Policy
-
-### By Us
-- We may terminate accounts that violate these terms
-- We will provide reasonable notice except in cases of serious violations
-- Upon termination, all rights and licenses granted to you will cease
-
-## Dispute Resolution
-
-### Governing Law
-These terms are governed by the laws of [Jurisdiction], without regard to conflict of law principles.
-
-### Arbitration
-Any disputes will be resolved through binding arbitration in accordance with the rules of [Arbitration Organization].
-
-## Changes to Terms
-
-We may update these terms from time to time. We will notify you of significant changes by email or through our service. Continued use after changes constitutes acceptance of the new terms.
-
-## Contact Information
-
-If you have questions about these Terms of Service, please contact us at:
-- Email: legal@flashcardapp.com
-- Address: [Company Address]
-
-Last updated: January 12, 2024`,
-          status: 'published',
-          lastModified: '2024-01-12T14:20:00Z',
-          lastModifiedBy: { name: 'Legal Team', email: 'legal@flashcardapp.com' },
-          seo: {
-            title: 'Terms of Service | FlashCard App',
-            description: 'Read our terms and conditions for using FlashCard App services, including user responsibilities, payment terms, and legal agreements.',
-            keywords: ['terms of service', 'user agreement', 'legal terms', 'conditions', 'subscription terms']
-          },
-          views: 892,
-          version: '3.0',
-          effectiveDate: '2024-01-12',
-          jurisdiction: 'Delaware, USA',
-          governingLaw: 'Delaware State Law'
-        }
-        setPageData(mockData)
+        setError(null)
+        
+        const response = await get('/api/admin/pages/terms')
+        setPageData(response.data)
       } catch (error) {
         console.error('Error fetching terms of service:', error)
+        setError('Failed to load terms of service data')
       } finally {
         setLoading(false)
       }
     }
 
     fetchPageData()
-  }, [])
+  }, [get])
 
   const handleSave = async () => {
     if (!pageData) return
     setSaving(true)
+    setError(null)
 
     try {
-      // Here you would make the API call to update the terms of service
-      console.log('Updating terms of service:', pageData)
+      const response = await put('/api/admin/pages/terms', pageData)
+      setPageData(response.data)
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Update the lastModified timestamp
-      setPageData(prev => prev ? ({ 
-        ...prev, 
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: { name: 'Current Admin', email: 'admin@flashcardapp.com' }
-      }) : null)
+      // Show success message (you could add a toast notification here)
+      console.log('Terms of service updated successfully')
     } catch (error) {
       console.error('Error updating terms of service:', error)
+      setError('Failed to save terms of service. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -274,6 +146,26 @@ Last updated: January 12, 2024`,
 
   return (
     <div className="space-y-6">
+      {/* Error Display */}
+      {error && (
+        <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex">
+            <ExclamationTriangleIcon className="w-5 h-5 text-red-400 mr-2 flex-shrink-0" />
+            <div>
+              <h4 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h4>
+              <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error}</p>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="ml-auto text-red-400 hover:text-red-600"
+            >
+              <span className="sr-only">Dismiss</span>
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center space-x-4">
@@ -289,12 +181,14 @@ Last updated: January 12, 2024`,
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Terms of Service</h1>
-              <div className="flex items-center space-x-4 mt-1">
-                <p className="text-sm text-gray-500 dark:text-accent-silver">
-                  Version {pageData.version} • Last updated: {new Date(pageData.lastModified).toLocaleDateString()}
-                </p>
-                {getStatusBadge(pageData.status)}
-              </div>
+              {pageData && (
+                <div className="flex items-center space-x-4 mt-1">
+                  <p className="text-sm text-gray-500 dark:text-accent-silver">
+                    Version {pageData.version} • Last updated: {new Date(pageData.lastModified).toLocaleDateString()}
+                  </p>
+                  {getStatusBadge(pageData.status)}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -357,7 +251,20 @@ Last updated: January 12, 2024`,
             </div>
 
             <div className="p-6">
-              {activeTab === 'content' && (
+              {loading && (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-neon"></div>
+                  <span className="ml-2 text-gray-600 dark:text-gray-400">Loading...</span>
+                </div>
+              )}
+              
+              {!loading && !pageData && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 dark:text-gray-400">No data available</p>
+                </div>
+              )}
+              
+              {!loading && pageData && activeTab === 'content' && (
                 <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -386,7 +293,7 @@ Last updated: January 12, 2024`,
                 </div>
               )}
 
-              {activeTab === 'seo' && (
+              {!loading && pageData && activeTab === 'seo' && (
                 <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -442,7 +349,7 @@ Last updated: January 12, 2024`,
                 </div>
               )}
 
-              {activeTab === 'settings' && (
+              {!loading && pageData && activeTab === 'settings' && (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -555,85 +462,96 @@ Last updated: January 12, 2024`,
             transition={{ delay: 0.1 }}
             className="bg-white dark:bg-accent-obsidian rounded-xl shadow-sm border border-gray-200 dark:border-accent-silver/10 p-6 space-y-6"
           >
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Page Statistics</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-accent-silver">Views:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">{pageData.views.toLocaleString()}</span>
+            {!loading && pageData && (
+              <>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Page Statistics</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-accent-silver">Views:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{pageData.views.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-accent-silver">Word Count:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {pageData.content.split(/\s+/).filter(word => word.length > 0).length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-accent-silver">Reading Time:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {Math.ceil(pageData.content.split(/\s+/).length / 200)} min
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-accent-silver">Word Count:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {pageData.content.split(/\s+/).filter(word => word.length > 0).length}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-accent-silver">Reading Time:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {Math.ceil(pageData.content.split(/\s+/).length / 200)} min
-                  </span>
-                </div>
-              </div>
-            </div>
 
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Legal Information</h4>
-              <div className="space-y-2 text-sm text-gray-500 dark:text-accent-silver">
                 <div>
-                  <span className="block">Jurisdiction:</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {pageData.jurisdiction}
-                  </span>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Legal Information</h4>
+                  <div className="space-y-2 text-sm text-gray-500 dark:text-accent-silver">
+                    <div>
+                      <span className="block">Jurisdiction:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {pageData.jurisdiction}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block">Governing Law:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {pageData.governingLaw}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block">Effective Date:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {new Date(pageData.effectiveDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="block">Governing Law:</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {pageData.governingLaw}
-                  </span>
-                </div>
-                <div>
-                  <span className="block">Effective Date:</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {new Date(pageData.effectiveDate).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            </div>
 
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Last Modified</h4>
-              <div className="space-y-2 text-sm text-gray-500 dark:text-accent-silver">
                 <div>
-                  <span className="block">Date:</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {new Date(pageData.lastModified).toLocaleDateString()}
-                  </span>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Last Modified</h4>
+                  <div className="space-y-2 text-sm text-gray-500 dark:text-accent-silver">
+                    <div>
+                      <span className="block">Date:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {new Date(pageData.lastModified).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block">By:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {pageData.lastModifiedBy.name}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="block">By:</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {pageData.lastModifiedBy.name}
-                  </span>
-                </div>
-              </div>
-            </div>
 
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Quick Actions</h4>
-              <div className="space-y-2">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="w-full px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button className="w-full px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors">
-                  Export PDF
-                </button>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Quick Actions</h4>
+                  <div className="space-y-2">
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="w-full px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button className="w-full px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors">
+                      Export PDF
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+            
+            {loading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent-neon"></div>
+                <span className="ml-2 text-gray-600 dark:text-gray-400">Loading...</span>
               </div>
-            </div>
+            )}
           </motion.div>
         </div>
       </div>

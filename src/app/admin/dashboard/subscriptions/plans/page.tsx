@@ -34,6 +34,49 @@ interface SubscriptionPlan {
     storage: string
     support: string
   }
+  fullPlanData?: {
+    price: {
+      monthly: number
+      yearly: number
+      currency: string
+    }
+    features: {
+      maxDecks: number
+      maxCards: number
+      maxAiGenerations: number
+      maxStorage: number
+      aiFlashcardCredits: number
+      aiQuizCredits: number
+      aiNotesCredits: number
+      aiAssistantCredits: number
+      manualQuizCredits: number
+      deckCredits: number
+      prioritySupport: boolean
+      advancedAnalytics: boolean
+      customBranding: boolean
+      apiAccess: boolean
+      exportFeatures: boolean
+      collaborativeDecks: boolean
+      offlineAccess: boolean
+      customCategories: boolean
+    }
+    limits: {
+      dailyAiGenerations: number
+      monthlyAiGenerations: number
+      concurrentSessions: number
+      fileUploadSize: number
+    }
+    selectedFeatures: string[]
+    visibility: {
+      isActive: boolean
+      isPublic: boolean
+    }
+    trial: {
+      enabled: boolean
+      durationDays: number
+      features: string[]
+    }
+  }
   selectedFeatures?: string[]
   isActive: boolean
   isPopular: boolean
@@ -49,25 +92,18 @@ interface PlanFormData {
   price: {
     monthly: number
     yearly: number
+    currency: string
   }
   features: {
     maxDecks: number
-    maxCards: number
-    maxAiGenerations: number
-    maxStorage: number // in MB
-  }
-  limits: {
-    dailyAiGenerations: number
-    monthlyAiGenerations: number
-    concurrentSessions: number
-    fileUploadSize: number // in MB
-  }
-  trial: {
-    enabled: boolean
-    durationDays: number
+    aiFlashcardCredits: number
+    aiQuizCredits: number
+    aiNotesCredits: number
+    aiAssistantCredits: number
   }
   selectedFeatures: string[]
   isActive: boolean
+  isPublic: boolean
   isPopular: boolean
 }
 
@@ -87,26 +123,19 @@ export default function PlanManagementPage() {
     description: '',
     price: {
       monthly: 0,
-      yearly: 0
+      yearly: 0,
+      currency: 'USD'
     },
     features: {
-      maxDecks: 10,
-      maxCards: 100,
-      maxAiGenerations: 50,
-      maxStorage: 1024 // 1GB in MB
-    },
-    limits: {
-      dailyAiGenerations: 5,
-      monthlyAiGenerations: 50,
-      concurrentSessions: 1,
-      fileUploadSize: 5 // 5MB
-    },
-    trial: {
-      enabled: false,
-      durationDays: 7
+      maxDecks: 0,
+      aiFlashcardCredits: 0,
+      aiQuizCredits: 0,
+      aiNotesCredits: 0,
+      aiAssistantCredits: 0
     },
     selectedFeatures: [],
     isActive: true,
+    isPublic: true,
     isPopular: false
   })
 
@@ -266,25 +295,19 @@ export default function PlanManagementPage() {
       description: '',
       price: {
         monthly: 0,
-        yearly: 0
+        yearly: 0,
+        currency: 'USD'
       },
       features: {
-        maxDecks: 10,
-        maxCards: 100,
-        maxAiGenerations: 50,
-        maxStorage: 1024 // 1GB in MB
+        maxDecks: 0,
+        aiFlashcardCredits: 0,
+        aiQuizCredits: 0,
+        aiNotesCredits: 0,
+        aiAssistantCredits: 0
       },
-      limits: {
-        dailyAiGenerations: 5,
-        monthlyAiGenerations: 50,
-        concurrentSessions: 1,
-        fileUploadSize: 5 // 5MB
-      },
-      trial: {
-        enabled: false,
-        durationDays: 7
-      },
+      selectedFeatures: [],
       isActive: true,
+      isPublic: true,
       isPopular: false
     })
     setShowModal(true)
@@ -292,33 +315,29 @@ export default function PlanManagementPage() {
 
   const handleEditPlan = (plan: SubscriptionPlan) => {
     setEditingPlan(plan)
-    // Transform backend data to frontend form structure
+    
+    // Use fullPlanData if available, otherwise use defaults
+    const planData = plan.fullPlanData;
+    
     setFormData({
       name: plan.name,
       description: plan.description,
       price: {
-        monthly: typeof plan.price === 'number' ? plan.price : 0,
-        yearly: typeof plan.price === 'number' ? plan.price * 12 : 0
+        monthly: planData?.price?.monthly || plan.price || 0,
+        yearly: planData?.price?.yearly || (plan.price * 12) || 0,
+        currency: planData?.price?.currency || 'USD'
       },
       features: {
-        maxDecks: plan.limits?.decks === 'unlimited' ? 999999 : (typeof plan.limits?.decks === 'number' ? plan.limits.decks : 10),
-        maxCards: plan.limits?.cards === 'unlimited' ? 999999 : (typeof plan.limits?.cards === 'number' ? plan.limits.cards : 100),
-        maxAiGenerations: 50, // Default value
-        maxStorage: parseStorageToMB(plan.limits?.storage || '1GB')
+        maxDecks: planData?.features?.maxDecks || (plan.limits?.decks === 'unlimited' ? 999999 : (typeof plan.limits?.decks === 'number' ? plan.limits.decks : 10)),
+        aiFlashcardCredits: planData?.features?.aiFlashcardCredits || 0,
+        aiQuizCredits: planData?.features?.aiQuizCredits || 0,
+        aiNotesCredits: planData?.features?.aiNotesCredits || 0,
+        aiAssistantCredits: planData?.features?.aiAssistantCredits || 0
       },
-      limits: {
-        dailyAiGenerations: 5, // Default value
-        monthlyAiGenerations: 50, // Default value
-        concurrentSessions: 1, // Default value
-        fileUploadSize: 5 // Default value
-      },
-      trial: {
-        enabled: false, // Default value
-        durationDays: 7 // Default value
-      },
-      selectedFeatures: plan.selectedFeatures || [],
-      isActive: plan.isActive,
-      isPopular: plan.isPopular
+      selectedFeatures: planData?.selectedFeatures || plan.selectedFeatures || [],
+      isActive: planData?.visibility?.isActive ?? plan.isActive,
+      isPublic: planData?.visibility?.isPublic ?? true,
+      isPopular: plan.isPopular ?? false
     })
     setShowModal(true)
   }
@@ -574,6 +593,15 @@ export default function PlanManagementPage() {
                     <label className="flex items-center">
                       <input
                         type="checkbox"
+                        checked={formData.isPublic}
+                        onChange={(e) => setFormData(prev => ({ ...prev, isPublic: e.target.checked }))}
+                        className="rounded border-accent-silver/20 text-accent-neon focus:ring-accent-neon"
+                      />
+                      <span className="ml-2 text-sm text-accent-silver">Public</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
                         checked={formData.isPopular}
                         onChange={(e) => setFormData(prev => ({ ...prev, isPopular: e.target.checked }))}
                         className="rounded border-accent-silver/20 text-accent-neon focus:ring-accent-neon"
@@ -601,7 +629,7 @@ export default function PlanManagementPage() {
                   <label className="block text-sm font-medium text-accent-silver mb-3">
                     Plan Limits
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs text-accent-silver/70 mb-1">Max Decks</label>
                       <input
@@ -613,150 +641,63 @@ export default function PlanManagementPage() {
                           features: { ...prev.features, maxDecks: parseInt(e.target.value) || 0 }
                         }))}
                         className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
-                        placeholder="10 (999999 for unlimited)"
+                        placeholder="0 (999999 for unlimited)"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-accent-silver/70 mb-1">Max Cards</label>
+                      <label className="block text-xs text-accent-silver/70 mb-1">AI Flashcard Credits</label>
                       <input
                         type="number"
                         min="0"
-                        value={formData.features.maxCards}
+                        value={formData.features.aiFlashcardCredits}
                         onChange={(e) => setFormData(prev => ({
                           ...prev,
-                          features: { ...prev.features, maxCards: parseInt(e.target.value) || 0 }
+                          features: { ...prev.features, aiFlashcardCredits: parseInt(e.target.value) || 0 }
                         }))}
                         className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
-                        placeholder="100 (999999 for unlimited)"
+                        placeholder="0 (999999 for unlimited)"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-accent-silver/70 mb-1">Max AI Generations</label>
+                      <label className="block text-xs text-accent-silver/70 mb-1">AI Quiz Credits</label>
                       <input
                         type="number"
                         min="0"
-                        value={formData.features.maxAiGenerations}
+                        value={formData.features.aiQuizCredits}
                         onChange={(e) => setFormData(prev => ({
                           ...prev,
-                          features: { ...prev.features, maxAiGenerations: parseInt(e.target.value) || 0 }
+                          features: { ...prev.features, aiQuizCredits: parseInt(e.target.value) || 0 }
                         }))}
                         className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
-                        placeholder="50 (999999 for unlimited)"
+                        placeholder="0 (999999 for unlimited)"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-accent-silver/70 mb-1">Storage (MB)</label>
+                      <label className="block text-xs text-accent-silver/70 mb-1">AI Notes Credits</label>
                       <input
                         type="number"
                         min="0"
-                        value={formData.features.maxStorage}
+                        value={formData.features.aiNotesCredits}
                         onChange={(e) => setFormData(prev => ({
                           ...prev,
-                          features: { ...prev.features, maxStorage: parseInt(e.target.value) || 0 }
+                          features: { ...prev.features, aiNotesCredits: parseInt(e.target.value) || 0 }
                         }))}
                         className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
-                        placeholder="1024 (1GB = 1024MB)"
+                        placeholder="0 (999999 for unlimited)"
                       />
                     </div>
-                  </div>
-                </div>
-
-                {/* AI Generation Limits */}
-                <div>
-                  <label className="block text-sm font-medium text-accent-silver mb-3">
-                    AI Generation Limits
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-xs text-accent-silver/70 mb-1">Daily AI Generations</label>
+                      <label className="block text-xs text-accent-silver/70 mb-1">AI Assistant Credits</label>
                       <input
                         type="number"
                         min="0"
-                        value={formData.limits.dailyAiGenerations}
+                        value={formData.features.aiAssistantCredits}
                         onChange={(e) => setFormData(prev => ({
                           ...prev,
-                          limits: { ...prev.limits, dailyAiGenerations: parseInt(e.target.value) || 0 }
+                          features: { ...prev.features, aiAssistantCredits: parseInt(e.target.value) || 0 }
                         }))}
                         className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
-                        placeholder="5"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-accent-silver/70 mb-1">Monthly AI Generations</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={formData.limits.monthlyAiGenerations}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          limits: { ...prev.limits, monthlyAiGenerations: parseInt(e.target.value) || 0 }
-                        }))}
-                        className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
-                        placeholder="50"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-accent-silver/70 mb-1">Concurrent Sessions</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={formData.limits.concurrentSessions}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          limits: { ...prev.limits, concurrentSessions: parseInt(e.target.value) || 1 }
-                        }))}
-                        className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
-                        placeholder="1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-accent-silver/70 mb-1">File Upload Size (MB)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={formData.limits.fileUploadSize}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          limits: { ...prev.limits, fileUploadSize: parseInt(e.target.value) || 0 }
-                        }))}
-                        className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
-                        placeholder="5"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-
-                {/* Trial Settings */}
-                <div>
-                  <label className="block text-sm font-medium text-accent-silver mb-3">
-                    Trial Settings
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={formData.trial.enabled}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          trial: { ...prev.trial, enabled: e.target.checked }
-                        }))}
-                        className="rounded border-accent-silver/20 text-accent-neon focus:ring-accent-neon"
-                      />
-                      <span className="ml-2 text-sm text-accent-silver">Enable Trial</span>
-                    </label>
-                    <div>
-                      <label className="block text-xs text-accent-silver/70 mb-1">Trial Duration (Days)</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={formData.trial.durationDays}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          trial: { ...prev.trial, durationDays: parseInt(e.target.value) || 7 }
-                        }))}
-                        className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
-                        placeholder="7"
+                        placeholder="0 (999999 for unlimited)"
                       />
                     </div>
                   </div>
@@ -792,13 +733,13 @@ export default function PlanManagementPage() {
                                 <label key={feature.key} className="flex items-start space-x-2 cursor-pointer">
                                   <input
                                     type="checkbox"
-                                    checked={formData.selectedFeatures.includes(feature.key)}
+                                    checked={formData.selectedFeatures?.includes(feature.key) || false}
                                     onChange={(e) => {
                                       setFormData(prev => ({
                                         ...prev,
                                         selectedFeatures: e.target.checked
-                                          ? [...prev.selectedFeatures, feature.key]
-                                          : prev.selectedFeatures.filter(f => f !== feature.key)
+                                          ? [...(prev.selectedFeatures || []), feature.key]
+                                          : (prev.selectedFeatures || []).filter(f => f !== feature.key)
                                       }))
                                     }}
                                     className="mt-0.5 rounded border-accent-silver/20 text-accent-neon focus:ring-accent-neon"
@@ -820,7 +761,7 @@ export default function PlanManagementPage() {
                     )}
                   </div>
                   <div className="mt-2 text-xs text-accent-silver/60">
-                    Selected features: {formData.selectedFeatures.length}
+                    Selected features: {formData.selectedFeatures?.length || 0}
                   </div>
                 </div>
               </div>

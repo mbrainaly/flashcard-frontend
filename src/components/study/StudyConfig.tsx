@@ -2,7 +2,6 @@ import { motion } from 'framer-motion'
 import { Switch } from '@headlessui/react'
 import {
   ArrowsUpDownIcon,
-  ShareIcon,
   ChartBarIcon,
   ClockIcon,
 } from '@heroicons/react/24/outline'
@@ -12,7 +11,6 @@ export interface StudyConfig {
   cardDirection: 'front-to-back' | 'back-to-front' | 'mixed'
   dailyLimit: number
   showProgress: boolean
-  enableSharing: boolean
 }
 
 interface StudyConfigProps {
@@ -133,31 +131,6 @@ export default function StudyConfig({
         </Switch>
       </div>
 
-      {/* Sharing */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ShareIcon className="h-5 w-5 text-accent-silver" />
-          <div>
-            <h3 className="text-sm font-medium text-white">Enable Sharing</h3>
-            <p className="text-xs text-accent-silver">
-              Share progress with friends
-            </p>
-          </div>
-        </div>
-        <Switch
-          checked={config.enableSharing}
-          onChange={(checked) => onChange({ enableSharing: checked })}
-          className={`${
-            config.enableSharing ? 'bg-accent-neon' : 'bg-glass'
-          } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent-neon focus:ring-offset-2 focus:ring-offset-black`}
-        >
-          <span
-            className={`${
-              config.enableSharing ? 'translate-x-6' : 'translate-x-1'
-            } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
-          />
-        </Switch>
-      </div>
     </div>
   )
 } 

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { useSeoSettings } from '@/hooks/useSeoSettings'
 
 const navigation = {
   main: [
@@ -48,6 +49,7 @@ const navigation = {
 }
 
 export default function Footer() {
+  const { seoSettings } = useSeoSettings()
   return (
     <footer className="bg-accent-obsidian border-t border-accent-silver/10">
       <div className="mx-auto max-w-7xl overflow-hidden px-6 py-12 sm:py-16 lg:px-8">
@@ -82,12 +84,18 @@ export default function Footer() {
         {/* Logo and copyright */}
         <div className="mt-10 flex flex-col items-center">
           <div className="bg-glass backdrop-blur-sm px-4 py-2 rounded-full shadow-neon mb-4">
-            <Link href="/" className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-accent-gold to-accent-neon">
-              AIFlash
+            <Link href="/" className="flex items-center">
+              {seoSettings?.logoUrl && (
+                <img
+                  src={seoSettings.logoUrl}
+                  alt="Logo"
+                  className="h-8 w-auto object-contain"
+                />
+              )}
             </Link>
           </div>
           <p className="mt-2 text-center text-xs leading-5 text-accent-silver">
-            &copy; {new Date().getFullYear()} AIFlash. All rights reserved.
+            &copy; {new Date().getFullYear()} {seoSettings?.siteName || 'FlashCard App'}. All rights reserved.
           </p>
         </div>
 

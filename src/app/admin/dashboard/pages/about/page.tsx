@@ -16,6 +16,7 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
 import Link from 'next/link'
 
 interface AboutPageData {
@@ -64,171 +65,117 @@ interface AboutPageData {
 
 export default function AboutPage() {
   const { hasPermission } = useAdminAuth()
+  const { get, put } = useAdminApi()
   const [pageData, setPageData] = useState<AboutPageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'content' | 'team' | 'seo' | 'settings'>('content')
+
+  // Image upload helper function
+  const uploadSectionImage = async (file: File, sectionId: string) => {
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/pages/upload-image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: formData
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to upload image')
+      }
+      
+      const result = await response.json()
+      const imageUrl = result.data.url
+      
+      console.log(`Uploaded ${sectionId} image:`, imageUrl)
+      
+      // Update sections with S3 URL
+      const newSections = pageData?.sections || []
+      const sectionIndex = newSections.findIndex(s => s.id === sectionId)
+      if (sectionIndex >= 0) {
+        newSections[sectionIndex] = { ...newSections[sectionIndex], image: imageUrl }
+        console.log(`Updated existing section ${sectionId}:`, newSections[sectionIndex])
+      } else {
+        const order = sectionId === 'hero' ? 1 : sectionId === 'mission' ? 2 : sectionId === 'values' ? 3 : 4
+        const newSection = { id: sectionId, title: '', content: '', image: imageUrl, order, _id: '' }
+        newSections.push(newSection)
+        console.log(`Created new section ${sectionId}:`, newSection)
+      }
+      setPageData(prev => prev ? ({ ...prev, sections: newSections }) : null)
+      console.log('Updated pageData.sections:', newSections)
+      
+      return imageUrl
+    } catch (error) {
+      console.error(`Error uploading ${sectionId} image:`, error)
+      alert('Failed to upload image. Please try again.')
+      throw error
+    }
+  }
   const [previewMode, setPreviewMode] = useState(false)
 
   useEffect(() => {
     const fetchPageData = async () => {
       try {
         setLoading(true)
-        // Mock data for now
-        const mockData: AboutPageData = {
-          _id: '3',
-          title: 'About FlashCard App',
-          slug: 'about',
-          content: `# About FlashCard App
-
-## Our Story
-
-FlashCard App was born from a simple observation: traditional studying methods weren't keeping up with how our brains actually learn. Founded in 2023 by a team of educators, cognitive scientists, and technologists, we set out to create a learning platform that harnesses the power of spaced repetition and active recall.
-
-## Our Mission
-
-We believe that everyone deserves access to effective learning tools. Our mission is to make studying more efficient, engaging, and scientifically-backed, helping millions of learners around the world achieve their educational goals.
-
-## What Makes Us Different
-
-### Science-Based Learning
-Our algorithms are built on decades of cognitive science research, implementing proven techniques like spaced repetition and active recall to maximize retention.
-
-### User-Centric Design
-Every feature is designed with the learner in mind, from intuitive interfaces to personalized study schedules that adapt to your learning patterns.
-
-### Community-Driven
-We believe learning is better together. Our platform fosters collaboration and knowledge sharing among learners worldwide.
-
-## Our Impact
-
-Since our launch, FlashCard App has helped:
-- Over 100,000 students improve their study efficiency
-- Educators create more engaging learning materials
-- Professionals master new skills and advance their careers
-
-## Looking Forward
-
-We're constantly innovating to bring you the latest in learning technology. From AI-powered content generation to advanced analytics, we're committed to staying at the forefront of educational technology.
-
-Join us on our mission to revolutionize learning, one flashcard at a time.`,
-          status: 'published',
-          lastModified: '2024-01-18T09:15:00Z',
-          lastModifiedBy: { name: 'Marketing Team', email: 'marketing@flashcardapp.com' },
-          seo: {
-            title: 'About Us | FlashCard App - Revolutionizing Learning',
-            description: 'Discover the story behind FlashCard App and our mission to improve learning through science-backed study methods and innovative technology.',
-            keywords: ['about us', 'company story', 'mission', 'learning technology', 'education', 'spaced repetition']
-          },
-          views: 2156,
-          sections: [
-            {
-              id: '1',
-              title: 'Our Story',
-              content: 'The founding story of FlashCard App...',
-              order: 1
-            },
-            {
-              id: '2',
-              title: 'Our Mission',
-              content: 'Our mission and values...',
-              order: 2
-            },
-            {
-              id: '3',
-              title: 'What Makes Us Different',
-              content: 'Our unique approach to learning...',
-              order: 3
-            }
-          ],
-          teamMembers: [
-            {
-              id: '1',
-              name: 'Sarah Chen',
-              role: 'CEO & Co-Founder',
-              bio: 'Former educator with 10+ years of experience in cognitive science and learning technology.',
-              socialLinks: {
-                linkedin: 'https://linkedin.com/in/sarahchen',
-                twitter: 'https://twitter.com/sarahchen'
-              }
-            },
-            {
-              id: '2',
-              name: 'Michael Rodriguez',
-              role: 'CTO & Co-Founder',
-              bio: 'Software engineer passionate about using technology to improve education and learning outcomes.',
-              socialLinks: {
-                linkedin: 'https://linkedin.com/in/michaelrodriguez',
-                github: 'https://github.com/michaelrodriguez'
-              }
-            },
-            {
-              id: '3',
-              name: 'Dr. Emily Watson',
-              role: 'Head of Learning Science',
-              bio: 'PhD in Cognitive Psychology with expertise in memory, learning, and educational technology.',
-              socialLinks: {
-                linkedin: 'https://linkedin.com/in/emilywatson'
-              }
-            },
-            {
-              id: '4',
-              name: 'David Kim',
-              role: 'Head of Product',
-              bio: 'Product leader with experience building user-centric educational platforms and learning tools.',
-              socialLinks: {
-                linkedin: 'https://linkedin.com/in/davidkim',
-                twitter: 'https://twitter.com/davidkim'
-              }
-            }
-          ],
-          companyInfo: {
-            founded: '2023',
-            mission: 'To make studying more efficient, engaging, and scientifically-backed for learners worldwide.',
-            vision: 'A world where everyone has access to personalized, effective learning tools.',
-            values: [
-              'Evidence-based learning',
-              'User-centric design',
-              'Accessibility for all',
-              'Continuous innovation',
-              'Community collaboration'
-            ]
-          }
+        setError(null)
+        
+        const response = await get('/api/admin/pages/about')
+        
+        if (response.success) {
+          setPageData(response.data)
+        } else {
+          setError(response.message || 'Failed to fetch page data')
         }
-        setPageData(mockData)
       } catch (error) {
-        console.error('Error fetching about page:', error)
+        console.error('Error fetching page data:', error)
+        setError('Failed to load page data')
       } finally {
         setLoading(false)
       }
     }
 
     fetchPageData()
-  }, [])
+  }, [get])
 
   const handleSave = async () => {
     if (!pageData) return
-    setSaving(true)
 
     try {
-      // Here you would make the API call to update the about page
-      console.log('Updating about page:', pageData)
+      setSaving(true)
+      setError(null)
+
+      console.log('Saving pageData.sections:', JSON.stringify(pageData.sections, null, 2))
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Update the lastModified timestamp
-      setPageData(prev => prev ? ({ 
-        ...prev, 
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: { name: 'Current Admin', email: 'admin@flashcardapp.com' }
-      }) : null)
+      const response = await put('/api/admin/pages/about', {
+        title: pageData.title,
+        content: pageData.content,
+        seo: pageData.seo,
+        sections: pageData.sections,
+        teamMembers: pageData.teamMembers,
+        companyInfo: pageData.companyInfo,
+        status: pageData.status
+      })
+
+      if (response.success) {
+        setPageData(response.data)
+        console.log('Page saved successfully!')
+      } else {
+        setError(response.message || 'Failed to save page')
+      }
     } catch (error) {
-      console.error('Error updating about page:', error)
+      console.error('Error saving page:', error)
+      setError('Failed to save page')
     } finally {
       setSaving(false)
     }
   }
+
 
   const getStatusBadge = (status: AboutPageData['status']) => {
     const statusConfig = {
@@ -369,6 +316,25 @@ Join us on our mission to revolutionize learning, one flashcard at a time.`,
         </div>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex">
+            <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
+              <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error}</p>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="ml-auto text-red-400 hover:text-red-600"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-3">
@@ -407,7 +373,7 @@ Join us on our mission to revolutionize learning, one flashcard at a time.`,
 
             <div className="p-6">
               {activeTab === 'content' && (
-                <div className="space-y-6">
+                <div className="space-y-8">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Page Title
@@ -420,17 +386,444 @@ Join us on our mission to revolutionize learning, one flashcard at a time.`,
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Content
-                    </label>
-                    <textarea
-                      value={pageData.content}
-                      onChange={(e) => setPageData(prev => prev ? ({ ...prev, content: e.target.value }) : null)}
-                      rows={25}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent font-mono text-sm"
-                      placeholder="Enter about page content (Markdown supported)..."
-                    />
+                  {/* Hero Section */}
+                  <div className="bg-accent-silver/5 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Hero Section</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Hero Title
+                        </label>
+                        <input
+                          type="text"
+                          value={pageData.sections?.find(s => s.id === 'hero')?.title || ''}
+                          onChange={(e) => {
+                            const newSections = pageData.sections || []
+                            const heroIndex = newSections.findIndex(s => s.id === 'hero')
+                            if (heroIndex >= 0) {
+                              newSections[heroIndex] = { ...newSections[heroIndex], title: e.target.value }
+                            } else {
+                              newSections.push({ id: 'hero', title: e.target.value, content: '', order: 1, _id: '' })
+                            }
+                            setPageData(prev => prev ? ({ ...prev, sections: newSections }) : null)
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="Our Story"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Hero Content
+                        </label>
+                        <textarea
+                          value={pageData.sections?.find(s => s.id === 'hero')?.content || ''}
+                          onChange={(e) => {
+                            const newSections = pageData.sections || []
+                            const heroIndex = newSections.findIndex(s => s.id === 'hero')
+                            if (heroIndex >= 0) {
+                              newSections[heroIndex] = { ...newSections[heroIndex], content: e.target.value }
+                            } else {
+                              newSections.push({ id: 'hero', title: '', content: e.target.value, order: 1, _id: '' })
+                            }
+                            setPageData(prev => prev ? ({ ...prev, sections: newSections }) : null)
+                          }}
+                          rows={4}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="Brief introduction about your company..."
+                        />
+                      </div>
+                      <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Hero Image (Right Side)
+                      </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              await uploadSectionImage(file, 'hero')
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                        />
+                        {pageData.sections?.find(s => s.id === 'hero')?.image && (
+                          <div className="mt-2">
+                            <img
+                              src={pageData.sections.find(s => s.id === 'hero')?.image}
+                              alt="Hero preview"
+                              className="w-32 h-20 object-cover rounded border"
+                            />
+                          </div>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Upload an image for the hero section (displays on the right side)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mission Section */}
+                  <div className="bg-accent-silver/5 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Mission Section</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Mission Title
+                        </label>
+                        <input
+                          type="text"
+                          value={pageData.sections?.find(s => s.id === 'mission')?.title || ''}
+                          onChange={(e) => {
+                            const newSections = pageData.sections || []
+                            const missionIndex = newSections.findIndex(s => s.id === 'mission')
+                            if (missionIndex >= 0) {
+                              newSections[missionIndex] = { ...newSections[missionIndex], title: e.target.value }
+                            } else {
+                              newSections.push({ id: 'mission', title: e.target.value, content: '', order: 2, _id: '' })
+                            }
+                            setPageData(prev => prev ? ({ ...prev, sections: newSections }) : null)
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="Transforming education through AI"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Mission Content
+                        </label>
+                        <textarea
+                          value={pageData.sections?.find(s => s.id === 'mission')?.content || ''}
+                          onChange={(e) => {
+                            const newSections = pageData.sections || []
+                            const missionIndex = newSections.findIndex(s => s.id === 'mission')
+                            if (missionIndex >= 0) {
+                              newSections[missionIndex] = { ...newSections[missionIndex], content: e.target.value }
+                            } else {
+                              newSections.push({ id: 'mission', title: '', content: e.target.value, order: 2, _id: '' })
+                            }
+                            setPageData(prev => prev ? ({ ...prev, sections: newSections }) : null)
+                          }}
+                          rows={6}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="Detailed mission statement..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Mission Section Image
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              await uploadSectionImage(file, 'mission')
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                        />
+                        {pageData.sections?.find(s => s.id === 'mission')?.image && (
+                          <div className="mt-2">
+                            <img
+                              src={pageData.sections.find(s => s.id === 'mission')?.image}
+                              alt="Mission preview"
+                              className="w-32 h-20 object-cover rounded border"
+                            />
+                          </div>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Upload an image for the mission section
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Values Section */}
+                  <div className="bg-accent-silver/5 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Our Values</h3>
+                      <button
+                        onClick={() => {
+                          const newValues = [...(pageData.companyInfo?.values || []), { name: '', icon: 'innovation', description: '' }]
+                          setPageData(prev => prev ? ({ 
+                            ...prev, 
+                            companyInfo: { 
+                              ...prev.companyInfo, 
+                              values: newValues 
+                            } 
+                          }) : null)
+                        }}
+                        className="inline-flex items-center px-3 py-1.5 bg-accent-neon hover:bg-accent-neon/90 text-black text-sm font-medium rounded-lg transition-colors"
+                      >
+                        Add Value
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Values Section Title
+                        </label>
+                        <input
+                          type="text"
+                          value={pageData.sections?.find(s => s.id === 'values')?.title || ''}
+                          onChange={(e) => {
+                            const newSections = pageData.sections || []
+                            const valuesIndex = newSections.findIndex(s => s.id === 'values')
+                            if (valuesIndex >= 0) {
+                              newSections[valuesIndex] = { ...newSections[valuesIndex], title: e.target.value }
+                            } else {
+                              newSections.push({ id: 'values', title: e.target.value, content: '', order: 3, _id: '' })
+                            }
+                            setPageData(prev => prev ? ({ ...prev, sections: newSections }) : null)
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="What drives us"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Values Description
+                        </label>
+                        <textarea
+                          value={pageData.sections?.find(s => s.id === 'values')?.content || ''}
+                          onChange={(e) => {
+                            const newSections = pageData.sections || []
+                            const valuesIndex = newSections.findIndex(s => s.id === 'values')
+                            if (valuesIndex >= 0) {
+                              newSections[valuesIndex] = { ...newSections[valuesIndex], content: e.target.value }
+                            } else {
+                              newSections.push({ id: 'values', title: '', content: e.target.value, order: 3, _id: '' })
+                            }
+                            setPageData(prev => prev ? ({ ...prev, sections: newSections }) : null)
+                          }}
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="Our values shape everything we do, from how we build our product to how we interact with our users."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Values Section Background Image
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              await uploadSectionImage(file, 'values')
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                        />
+                        {pageData.sections?.find(s => s.id === 'values')?.image && (
+                          <div className="mt-2">
+                            <img
+                              src={pageData.sections.find(s => s.id === 'values')?.image}
+                              alt="Values preview"
+                              className="w-32 h-20 object-cover rounded border"
+                            />
+                          </div>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Upload a background image for the values section
+                        </p>
+                      </div>
+
+                      {/* Individual Values */}
+                      <div className="space-y-4">
+                        <h4 className="text-md font-medium text-gray-900 dark:text-white">Individual Values</h4>
+                        {(pageData.companyInfo?.values || []).map((value, index) => (
+                          <div key={index} className="border border-gray-200 dark:border-accent-silver/20 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <h5 className="text-sm font-medium text-gray-900 dark:text-white">Value #{index + 1}</h5>
+                              <button
+                                onClick={() => {
+                                  const newValues = [...(pageData.companyInfo?.values || [])]
+                                  newValues.splice(index, 1)
+                                  setPageData(prev => prev ? ({ 
+                                    ...prev, 
+                                    companyInfo: { 
+                                      ...prev.companyInfo, 
+                                      values: newValues 
+                                    } 
+                                  }) : null)
+                                }}
+                                className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  Value Name
+                                </label>
+                                <input
+                                  type="text"
+                                  value={value.name || ''}
+                                  onChange={(e) => {
+                                    const newValues = [...(pageData.companyInfo?.values || [])]
+                                    newValues[index] = { ...newValues[index], name: e.target.value }
+                                    setPageData(prev => prev ? ({ 
+                                      ...prev, 
+                                      companyInfo: { 
+                                        ...prev.companyInfo, 
+                                        values: newValues 
+                                      } 
+                                    }) : null)
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                                  placeholder="Innovation"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  Icon
+                                </label>
+                                <select
+                                  value={value.icon || 'innovation'}
+                                  onChange={(e) => {
+                                    const newValues = [...(pageData.companyInfo?.values || [])]
+                                    newValues[index] = { ...newValues[index], icon: e.target.value }
+                                    setPageData(prev => prev ? ({ 
+                                      ...prev, 
+                                      companyInfo: { 
+                                        ...prev.companyInfo, 
+                                        values: newValues 
+                                      } 
+                                    }) : null)
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                                >
+                                  <option value="innovation">Innovation (Beaker)</option>
+                                  <option value="science">Science (Academic Cap)</option>
+                                  <option value="user">User Focus (Heart)</option>
+                                  <option value="community">Community (User Group)</option>
+                                  <option value="excellence">Excellence (Sparkles)</option>
+                                  <option value="accessibility">Accessibility (Globe)</option>
+                                  <option value="technology">Technology (Rocket)</option>
+                                  <option value="learning">Learning (Light Bulb)</option>
+                                </select>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-3">
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Description
+                              </label>
+                              <textarea
+                                value={value.description || ''}
+                                onChange={(e) => {
+                                  const newValues = [...(pageData.companyInfo?.values || [])]
+                                  newValues[index] = { ...newValues[index], description: e.target.value }
+                                  setPageData(prev => prev ? ({ 
+                                    ...prev, 
+                                    companyInfo: { 
+                                      ...prev.companyInfo, 
+                                      values: newValues 
+                                    } 
+                                  }) : null)
+                                }}
+                                rows={3}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                                placeholder="We embrace cutting-edge technology to create innovative learning experiences..."
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {(!pageData.companyInfo?.values || pageData.companyInfo.values.length === 0) && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                            No values added yet. Click "Add Value" to get started.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Looking Forward Section */}
+                  <div className="bg-accent-silver/5 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Looking Forward</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Future Vision Title
+                        </label>
+                        <input
+                          type="text"
+                          value={pageData.sections?.find(s => s.id === 'future')?.title || ''}
+                          onChange={(e) => {
+                            const newSections = pageData.sections || []
+                            const futureIndex = newSections.findIndex(s => s.id === 'future')
+                            if (futureIndex >= 0) {
+                              newSections[futureIndex] = { ...newSections[futureIndex], title: e.target.value }
+                            } else {
+                              newSections.push({ id: 'future', title: e.target.value, content: '', order: 4, _id: '' })
+                            }
+                            setPageData(prev => prev ? ({ ...prev, sections: newSections }) : null)
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="Looking Forward"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Future Vision Content
+                        </label>
+                        <textarea
+                          value={pageData.sections?.find(s => s.id === 'future')?.content || ''}
+                          onChange={(e) => {
+                            const newSections = pageData.sections || []
+                            const futureIndex = newSections.findIndex(s => s.id === 'future')
+                            if (futureIndex >= 0) {
+                              newSections[futureIndex] = { ...newSections[futureIndex], content: e.target.value }
+                            } else {
+                              newSections.push({ id: 'future', title: '', content: e.target.value, order: 4, _id: '' })
+                            }
+                            setPageData(prev => prev ? ({ ...prev, sections: newSections }) : null)
+                          }}
+                          rows={6}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="Our future plans and vision..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Future Section Image
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              await uploadSectionImage(file, 'future')
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                        />
+                        {pageData.sections?.find(s => s.id === 'future')?.image && (
+                          <div className="mt-2">
+                            <img
+                              src={pageData.sections.find(s => s.id === 'future')?.image}
+                              alt="Future preview"
+                              className="w-32 h-20 object-cover rounded border"
+                            />
+                          </div>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Upload an image for the future vision section
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

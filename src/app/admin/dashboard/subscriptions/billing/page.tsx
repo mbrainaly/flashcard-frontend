@@ -289,7 +289,7 @@ export default function BillingOverviewPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6"
         >
           <StatsCard
             title="Total Revenue"
@@ -307,7 +307,7 @@ export default function BillingOverviewPage() {
             icon={<BanknotesIcon className="w-6 h-6" />}
             color="green"
           />
-          <StatsCard
+          {/* <StatsCard
             title="Failed Payments"
             value={billingData.failedPayments.toLocaleString()}
             change="-5.2%"
@@ -322,7 +322,7 @@ export default function BillingOverviewPage() {
             trend="down"
             icon={<DocumentTextIcon className="w-6 h-6" />}
             color="orange"
-          />
+          /> */}
         </motion.div>
       )}
 

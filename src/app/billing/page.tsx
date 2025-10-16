@@ -12,6 +12,7 @@ import {
 import { CheckIcon } from '@heroicons/react/20/solid'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { createCheckoutSession, updateSubscription, getSubscription, getPlans, Subscription, Plan } from '@/services/subscription.service'
+import { getUserCredits, UserCredits, getFeatureDisplayName } from '@/services/userCredits.service'
 import { loadStripe } from '@stripe/stripe-js'
 
 // Initialize Stripe with your publishable key
@@ -40,7 +41,9 @@ function BillingContent() {
   const [activeTab, setActiveTab] = useState<'plans' | 'history'>('plans')
   const [dbPlans, setDbPlans] = useState<Plan[] | null>(null)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
+  const [userCredits, setUserCredits] = useState<UserCredits | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [isFetching, setIsFetching] = useState(false) // Prevent duplicate calls
 
   // Log session data for debugging
   useEffect(() => {
@@ -198,7 +201,7 @@ function BillingContent() {
     }
   }
 
-  // Fetch subscription data
+  // Fetch subscription data and user credits
   const fetchSubscription = async () => {
     // Only fetch if authenticated
     if (status !== 'authenticated' || !accessToken) {
@@ -206,12 +209,30 @@ function BillingContent() {
       return
     }
     
+    // Prevent duplicate calls
+    if (isFetching) {
+      console.log('Already fetching subscription, skipping duplicate call')
+      return
+    }
+    
     try {
+      setIsFetching(true)
       setIsLoading(true)
-      const data = await getSubscription()
-      setSubscription(data)
+      console.log('Fetching subscription and credits...')
+      
+      const [subscriptionData, creditsData] = await Promise.all([
+        getSubscription(),
+        getUserCredits()
+      ])
+      
+      console.log('Subscription data:', subscriptionData)
+      console.log('Credits data:', creditsData)
+      
+      setSubscription(subscriptionData)
+      setUserCredits(creditsData.data)
     } catch (error) {
-      console.error('Error fetching subscription:', error)
+      console.error('Error fetching subscription and credits:', error)
+      console.error('Error details:', error)
       setMessage({ type: 'error', text: 'Failed to load subscription details' })
       
       // If we get a 401 error, the token might be invalid or expired
@@ -221,6 +242,7 @@ function BillingContent() {
       }
     } finally {
       setIsLoading(false)
+      setIsFetching(false)
     }
   }
 
@@ -249,7 +271,7 @@ function BillingContent() {
     if (status === 'authenticated' && accessToken) {
       fetchSubscription()
     }
-  }, [status, session])
+  }, [status, accessToken]) // Remove 'session' to prevent excessive re-renders
 
   // Fetch plans from backend
   useEffect(() => {
@@ -374,12 +396,245 @@ function BillingContent() {
               </div>
               <div className="flex items-center gap-4">
                 <div className="bg-accent-neon/10 px-3 py-1 rounded-full">
-                  <span className="text-accent-neon text-sm font-medium">{subscription.credits} Credits</span>
-                </div>
-                <div className="bg-accent-neon/10 px-3 py-1 rounded-full">
                   <span className="text-accent-neon text-sm font-medium">{subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}</span>
                 </div>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+
+        {/* Feature Credits Display - 5 Individual Cards */}
+        {userCredits && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-8"
+          >
+            <h3 className="text-xl font-semibold text-white mb-6">
+              Your Feature Credits
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+              {/* Decks Card */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1 }}
+                className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 backdrop-blur-sm rounded-xl p-6 ring-1 ring-blue-500/20 hover:ring-blue-500/30 transition-all duration-300"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-white">
+                      {userCredits.decks.unlimited ? '∞' : userCredits.decks.remaining}
+                    </div>
+                    <div className="text-xs text-accent-silver">
+                      {userCredits.decks.unlimited ? 'Unlimited' : `of ${userCredits.decks.limit}`}
+                    </div>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <h4 className="text-sm font-medium text-white mb-1">Decks</h4>
+                  <p className="text-xs text-accent-silver/70">Create flashcard decks</p>
+                </div>
+                <div className="w-full bg-accent-silver/20 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      userCredits.decks.unlimited 
+                        ? 'bg-blue-400 w-full' 
+                        : userCredits.decks.remaining === 0 
+                          ? 'bg-red-500 w-full' 
+                          : 'bg-blue-400'
+                    }`}
+                    style={{ 
+                      width: userCredits.decks.unlimited 
+                        ? '100%' 
+                        : `${Math.max(5, (userCredits.decks.remaining / userCredits.decks.limit) * 100)}%` 
+                    }}
+                  />
+                </div>
+              </motion.div>
+
+              {/* AI Flashcards Card */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 }}
+                className="bg-gradient-to-br from-accent-neon/10 to-accent-neon/5 backdrop-blur-sm rounded-xl p-6 ring-1 ring-accent-neon/20 hover:ring-accent-neon/30 transition-all duration-300"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-accent-neon/20 rounded-lg">
+                    <svg className="w-6 h-6 text-accent-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-white">
+                      {userCredits.aiFlashcards.unlimited ? '∞' : userCredits.aiFlashcards.remaining}
+                    </div>
+                    <div className="text-xs text-accent-silver">
+                      {userCredits.aiFlashcards.unlimited ? 'Unlimited' : `of ${userCredits.aiFlashcards.limit}`}
+                    </div>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <h4 className="text-sm font-medium text-white mb-1">AI Flashcards</h4>
+                  <p className="text-xs text-accent-silver/70">Generate flashcards with AI</p>
+                </div>
+                <div className="w-full bg-accent-silver/20 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      userCredits.aiFlashcards.unlimited 
+                        ? 'bg-accent-neon w-full' 
+                        : userCredits.aiFlashcards.remaining === 0 
+                          ? 'bg-red-500 w-full' 
+                          : 'bg-accent-neon'
+                    }`}
+                    style={{ 
+                      width: userCredits.aiFlashcards.unlimited 
+                        ? '100%' 
+                        : `${Math.max(5, (userCredits.aiFlashcards.remaining / userCredits.aiFlashcards.limit) * 100)}%` 
+                    }}
+                  />
+                </div>
+              </motion.div>
+
+              {/* AI Quizzes Card */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3 }}
+                className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 backdrop-blur-sm rounded-xl p-6 ring-1 ring-purple-500/20 hover:ring-purple-500/30 transition-all duration-300"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-purple-500/20 rounded-lg">
+                    <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-white">
+                      {userCredits.aiQuizzes.unlimited ? '∞' : userCredits.aiQuizzes.remaining}
+                    </div>
+                    <div className="text-xs text-accent-silver">
+                      {userCredits.aiQuizzes.unlimited ? 'Unlimited' : `of ${userCredits.aiQuizzes.limit}`}
+                    </div>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <h4 className="text-sm font-medium text-white mb-1">AI Quizzes</h4>
+                  <p className="text-xs text-accent-silver/70">Create quizzes with AI</p>
+                </div>
+                <div className="w-full bg-accent-silver/20 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      userCredits.aiQuizzes.unlimited 
+                        ? 'bg-purple-400 w-full' 
+                        : userCredits.aiQuizzes.remaining === 0 
+                          ? 'bg-red-500 w-full' 
+                          : 'bg-purple-400'
+                    }`}
+                    style={{ 
+                      width: userCredits.aiQuizzes.unlimited 
+                        ? '100%' 
+                        : `${Math.max(5, (userCredits.aiQuizzes.remaining / userCredits.aiQuizzes.limit) * 100)}%` 
+                    }}
+                  />
+                </div>
+              </motion.div>
+
+              {/* AI Notes Card */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.4 }}
+                className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 backdrop-blur-sm rounded-xl p-6 ring-1 ring-emerald-500/20 hover:ring-emerald-500/30 transition-all duration-300"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-emerald-500/20 rounded-lg">
+                    <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-white">
+                      {userCredits.aiNotes.unlimited ? '∞' : userCredits.aiNotes.remaining}
+                    </div>
+                    <div className="text-xs text-accent-silver">
+                      {userCredits.aiNotes.unlimited ? 'Unlimited' : `of ${userCredits.aiNotes.limit}`}
+                    </div>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <h4 className="text-sm font-medium text-white mb-1">AI Notes</h4>
+                  <p className="text-xs text-accent-silver/70">Generate study notes</p>
+                </div>
+                <div className="w-full bg-accent-silver/20 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      userCredits.aiNotes.unlimited 
+                        ? 'bg-emerald-400 w-full' 
+                        : userCredits.aiNotes.remaining === 0 
+                          ? 'bg-red-500 w-full' 
+                          : 'bg-emerald-400'
+                    }`}
+                    style={{ 
+                      width: userCredits.aiNotes.unlimited 
+                        ? '100%' 
+                        : `${Math.max(5, (userCredits.aiNotes.remaining / userCredits.aiNotes.limit) * 100)}%` 
+                    }}
+                  />
+                </div>
+              </motion.div>
+
+              {/* AI Assistant Card */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5 }}
+                className="bg-gradient-to-br from-orange-500/10 to-orange-600/5 backdrop-blur-sm rounded-xl p-6 ring-1 ring-orange-500/20 hover:ring-orange-500/30 transition-all duration-300"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-orange-500/20 rounded-lg">
+                    <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-white">
+                      {userCredits.aiAssistant.unlimited ? '∞' : userCredits.aiAssistant.remaining}
+                    </div>
+                    <div className="text-xs text-accent-silver">
+                      {userCredits.aiAssistant.unlimited ? 'Unlimited' : `of ${userCredits.aiAssistant.limit}`}
+                    </div>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <h4 className="text-sm font-medium text-white mb-1">AI Assistant</h4>
+                  <p className="text-xs text-accent-silver/70">Get AI study help</p>
+                </div>
+                <div className="w-full bg-accent-silver/20 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      userCredits.aiAssistant.unlimited 
+                        ? 'bg-orange-400 w-full' 
+                        : userCredits.aiAssistant.remaining === 0 
+                          ? 'bg-red-500 w-full' 
+                          : 'bg-orange-400'
+                    }`}
+                    style={{ 
+                      width: userCredits.aiAssistant.unlimited 
+                        ? '100%' 
+                        : `${Math.max(5, (userCredits.aiAssistant.remaining / userCredits.aiAssistant.limit) * 100)}%` 
+                    }}
+                  />
+                </div>
+              </motion.div>
             </div>
           </motion.div>
         )}

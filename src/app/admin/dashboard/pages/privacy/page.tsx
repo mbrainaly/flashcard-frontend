@@ -13,6 +13,7 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
 import Link from 'next/link'
 
 interface PrivacyPageData {
@@ -44,9 +45,11 @@ interface PrivacyPageData {
 
 export default function PrivacyPolicyPage() {
   const { hasPermission } = useAdminAuth()
+  const { get, put } = useAdminApi()
   const [pageData, setPageData] = useState<PrivacyPageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'content' | 'seo' | 'settings'>('content')
   const [previewMode, setPreviewMode] = useState(false)
 
@@ -54,140 +57,35 @@ export default function PrivacyPolicyPage() {
     const fetchPageData = async () => {
       try {
         setLoading(true)
-        // Mock data for now
-        const mockData: PrivacyPageData = {
-          _id: '1',
-          title: 'Privacy Policy',
-          slug: 'privacy',
-          content: `# Privacy Policy
-
-## Introduction
-
-At FlashCard App, we are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, and safeguard your data when you use our flashcard application.
-
-## Information We Collect
-
-### Personal Information
-- Name and email address when you create an account
-- Profile information you choose to provide
-- Payment information for premium subscriptions
-
-### Usage Data
-- Study session data and progress
-- Flashcard creation and interaction data
-- Application usage analytics
-
-### Technical Information
-- Device information and operating system
-- IP address and location data
-- Browser type and version
-
-## How We Use Your Information
-
-We use your information to:
-- Provide and improve our flashcard services
-- Personalize your learning experience
-- Process payments and manage subscriptions
-- Send important updates and notifications
-- Analyze usage patterns to enhance our application
-
-## Data Sharing and Disclosure
-
-We do not sell, trade, or rent your personal information to third parties. We may share your information only in the following circumstances:
-- With your explicit consent
-- To comply with legal obligations
-- To protect our rights and prevent fraud
-- With trusted service providers who assist in our operations
-
-## Data Security
-
-We implement industry-standard security measures to protect your information:
-- Encryption of data in transit and at rest
-- Regular security audits and updates
-- Access controls and authentication
-- Secure payment processing
-
-## Your Rights
-
-You have the right to:
-- Access your personal information
-- Correct inaccurate data
-- Delete your account and data
-- Export your data
-- Opt-out of marketing communications
-
-## Cookies and Tracking
-
-We use cookies and similar technologies to:
-- Remember your preferences
-- Analyze site usage
-- Provide personalized content
-- Improve our services
-
-## Children's Privacy
-
-Our service is not intended for children under 13. We do not knowingly collect personal information from children under 13.
-
-## Changes to This Policy
-
-We may update this Privacy Policy from time to time. We will notify you of any significant changes by email or through our application.
-
-## Contact Us
-
-If you have any questions about this Privacy Policy, please contact us at privacy@flashcardapp.com.
-
-Last updated: January 15, 2024`,
-          status: 'published',
-          lastModified: '2024-01-15T10:30:00Z',
-          lastModifiedBy: { name: 'Legal Team', email: 'legal@flashcardapp.com' },
-          seo: {
-            title: 'Privacy Policy | FlashCard App',
-            description: 'Learn how FlashCard App protects your privacy and handles your personal data in compliance with GDPR and other privacy regulations.',
-            keywords: ['privacy policy', 'data protection', 'GDPR', 'personal information', 'data security']
-          },
-          views: 1247,
-          version: '2.1',
-          effectiveDate: '2024-01-15',
-          sections: [
-            { id: '1', title: 'Introduction', content: 'Privacy policy introduction...', order: 1 },
-            { id: '2', title: 'Information We Collect', content: 'Data collection details...', order: 2 },
-            { id: '3', title: 'How We Use Your Information', content: 'Data usage explanation...', order: 3 },
-            { id: '4', title: 'Data Sharing and Disclosure', content: 'Data sharing policies...', order: 4 },
-            { id: '5', title: 'Data Security', content: 'Security measures...', order: 5 },
-            { id: '6', title: 'Your Rights', content: 'User rights under GDPR...', order: 6 },
-            { id: '7', title: 'Contact Us', content: 'Contact information...', order: 7 }
-          ]
-        }
-        setPageData(mockData)
+        setError(null)
+        
+        const response = await get('/api/admin/pages/privacy')
+        setPageData(response.data)
       } catch (error) {
         console.error('Error fetching privacy policy:', error)
+        setError('Failed to load privacy policy data')
       } finally {
         setLoading(false)
       }
     }
 
     fetchPageData()
-  }, [])
+  }, [get])
 
   const handleSave = async () => {
     if (!pageData) return
     setSaving(true)
+    setError(null)
 
     try {
-      // Here you would make the API call to update the privacy policy
-      console.log('Updating privacy policy:', pageData)
+      const response = await put('/api/admin/pages/privacy', pageData)
+      setPageData(response.data)
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Update the lastModified timestamp
-      setPageData(prev => prev ? ({ 
-        ...prev, 
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: { name: 'Current Admin', email: 'admin@flashcardapp.com' }
-      }) : null)
+      // Show success message (you could add a toast notification here)
+      console.log('Privacy policy updated successfully')
     } catch (error) {
       console.error('Error updating privacy policy:', error)
+      setError('Failed to save privacy policy. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -252,6 +150,26 @@ Last updated: January 15, 2024`,
 
   return (
     <div className="space-y-6">
+      {/* Error Display */}
+      {error && (
+        <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex">
+            <ExclamationTriangleIcon className="w-5 h-5 text-red-400 mr-2 flex-shrink-0" />
+            <div>
+              <h4 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h4>
+              <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error}</p>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="ml-auto text-red-400 hover:text-red-600"
+            >
+              <span className="sr-only">Dismiss</span>
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center space-x-4">
@@ -267,12 +185,14 @@ Last updated: January 15, 2024`,
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Privacy Policy</h1>
-              <div className="flex items-center space-x-4 mt-1">
-                <p className="text-sm text-gray-500 dark:text-accent-silver">
-                  Version {pageData.version} • Last updated: {new Date(pageData.lastModified).toLocaleDateString()}
-                </p>
-                {getStatusBadge(pageData.status)}
-              </div>
+              {pageData && (
+                <div className="flex items-center space-x-4 mt-1">
+                  <p className="text-sm text-gray-500 dark:text-accent-silver">
+                    Version {pageData.version} • Last updated: {new Date(pageData.lastModified).toLocaleDateString()}
+                  </p>
+                  {getStatusBadge(pageData.status)}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -335,7 +255,20 @@ Last updated: January 15, 2024`,
             </div>
 
             <div className="p-6">
-              {activeTab === 'content' && (
+              {loading && (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-neon"></div>
+                  <span className="ml-2 text-gray-600 dark:text-gray-400">Loading...</span>
+                </div>
+              )}
+              
+              {!loading && !pageData && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 dark:text-gray-400">No data available</p>
+                </div>
+              )}
+              
+              {!loading && pageData && activeTab === 'content' && (
                 <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -364,7 +297,7 @@ Last updated: January 15, 2024`,
                 </div>
               )}
 
-              {activeTab === 'seo' && (
+              {!loading && pageData && activeTab === 'seo' && (
                 <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -420,7 +353,7 @@ Last updated: January 15, 2024`,
                 </div>
               )}
 
-              {activeTab === 'settings' && (
+              {!loading && pageData && activeTab === 'settings' && (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -499,61 +432,72 @@ Last updated: January 15, 2024`,
             transition={{ delay: 0.1 }}
             className="bg-white dark:bg-accent-obsidian rounded-xl shadow-sm border border-gray-200 dark:border-accent-silver/10 p-6 space-y-6"
           >
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Page Statistics</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-accent-silver">Views:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">{pageData.views.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-accent-silver">Word Count:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {pageData.content.split(/\s+/).filter(word => word.length > 0).length}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-accent-silver">Reading Time:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {Math.ceil(pageData.content.split(/\s+/).length / 200)} min
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Last Modified</h4>
-              <div className="space-y-2 text-sm text-gray-500 dark:text-accent-silver">
+            {!loading && pageData && (
+              <>
                 <div>
-                  <span className="block">Date:</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {new Date(pageData.lastModified).toLocaleDateString()}
-                  </span>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Page Statistics</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-accent-silver">Views:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{pageData.views.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-accent-silver">Word Count:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {pageData.content.split(/\s+/).filter(word => word.length > 0).length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-accent-silver">Reading Time:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {Math.ceil(pageData.content.split(/\s+/).length / 200)} min
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="block">By:</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {pageData.lastModifiedBy.name}
-                  </span>
-                </div>
-              </div>
-            </div>
 
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Quick Actions</h4>
-              <div className="space-y-2">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="w-full px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button className="w-full px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors">
-                  Export PDF
-                </button>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Last Modified</h4>
+                  <div className="space-y-2 text-sm text-gray-500 dark:text-accent-silver">
+                    <div>
+                      <span className="block">Date:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {new Date(pageData.lastModified).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block">By:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {pageData.lastModifiedBy.name}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Quick Actions</h4>
+                  <div className="space-y-2">
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="w-full px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button className="w-full px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors">
+                      Export PDF
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+            
+            {loading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent-neon"></div>
+                <span className="ml-2 text-gray-600 dark:text-gray-400">Loading...</span>
               </div>
-            </div>
+            )}
           </motion.div>
         </div>
       </div>

@@ -4,70 +4,80 @@ import { CheckIcon } from '@heroicons/react/20/solid'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { getPublicPlans, Plan } from '@/services/subscription.service'
 
-const tiers = [
-  {
-    name: 'Basic',
-    id: 'tier-basic',
-    planId: 'basic',
-    href: '/auth/register',
-    price: { monthly: '$0', annually: '$0' },
-    description: 'Perfect for getting started with flashcards.',
-    features: [
-      'Up to 50 flashcards',
-      'Basic AI card generation',
-      'Study progress tracking',
-      'Mobile-friendly interface',
-      'Community templates',
-    ],
-    featured: false,
-  },
-  {
-    name: 'Pro',
-    id: 'tier-pro',
-    planId: 'pro',
-    href: '/auth/register',
-    price: { monthly: '$15', annually: '$144' },
-    description: 'Ideal for serious learners and students.',
-    features: [
-      'Unlimited flashcards',
-      'Advanced AI generation',
-      'Custom study schedules',
-      'Performance analytics',
-      'Priority support',
-      'Offline access',
-      'Export capabilities',
-    ],
-    featured: true,
-  },
-  {
-    name: 'Team',
-    id: 'tier-team',
-    planId: 'team',
-    href: '/auth/register',
-    price: { monthly: '$49', annually: '$468' },
-    description: 'For educational institutions and study groups.',
-    features: [
-      'Everything in Pro',
-      'Team collaboration',
-      'Admin dashboard',
-      'Usage analytics',
-      'API access',
-      'Custom branding',
-      'Dedicated support',
-    ],
-    featured: false,
-  },
-]
+interface PricingTier {
+  name: string;
+  id: string;
+  planId: string;
+  href: string;
+  price: { monthly: string; annually: string };
+  description: string;
+  features: string[];
+  featured: boolean;
+}
 
 export default function PricingPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [isClient, setIsClient] = useState(false)
+  const [tiers, setTiers] = useState<PricingTier[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  // Fetch plans from database
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        setLoading(true)
+        const plans = await getPublicPlans()
+        
+        // Transform database plans to pricing tier format
+        const transformedTiers: PricingTier[] = plans.map((plan: Plan) => ({
+          name: plan.name === 'Basic' ? 'Free' : plan.name,
+          id: `tier-${plan.id}`,
+          planId: plan.id,
+          href: '/auth/register',
+          price: { 
+            monthly: `$${plan.price}`, 
+            annually: `$${plan.price * 12}` 
+          },
+          description: getDescriptionForPlan(plan.name),
+          features: plan.features,
+          featured: plan.isPopular || false // Use database isPopular field
+        }))
+        
+        setTiers(transformedTiers)
+      } catch (error) {
+        console.error('Error fetching plans:', error)
+        // Fallback to empty array if fetch fails
+        setTiers([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPlans()
+  }, [])
+
+  // Helper function to get description for each plan
+  const getDescriptionForPlan = (planName: string): string => {
+    switch (planName) {
+      case 'Basic':
+      case 'Free':
+        return 'Perfect for getting started with flashcards.'
+      case 'Pro':
+        return 'Ideal for serious learners and students.'
+      case 'Team':
+      case 'Enterprise':
+        return 'For educational institutions and study groups.'
+      default:
+        return 'A great plan for your learning needs.'
+    }
+  }
 
   const handleUpgradeClick = (tier) => {
     if (status === 'authenticated') {
@@ -102,7 +112,33 @@ export default function PricingPage() {
           functionality and support.
         </p>
         <div className="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-y-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3 lg:gap-x-8 xl:gap-x-12">
-          {tiers.map((tier) => (
+          {loading ? (
+            // Loading skeleton
+            Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={`skeleton-${index}`}
+                className="rounded-3xl p-8 xl:p-10 bg-glass backdrop-blur-sm ring-1 ring-accent-silver/10 animate-pulse"
+              >
+                <div className="h-6 bg-accent-silver/20 rounded mb-4"></div>
+                <div className="h-4 bg-accent-silver/20 rounded mb-6"></div>
+                <div className="h-10 bg-accent-silver/20 rounded mb-6"></div>
+                <div className="h-10 bg-accent-silver/20 rounded mb-8"></div>
+                <div className="space-y-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="h-4 bg-accent-silver/20 rounded"></div>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : tiers.length === 0 ? (
+            // No plans available
+            <div className="col-span-3 text-center py-12">
+              <p className="text-accent-silver">No pricing plans available at the moment.</p>
+              <p className="text-accent-silver/70 text-sm mt-2">Please check back later or contact support.</p>
+            </div>
+          ) : (
+            // Render actual tiers
+            tiers.map((tier) => (
             <div
               key={tier.id}
               className={classNames(
@@ -148,7 +184,8 @@ export default function PricingPage() {
                 ))}
               </ul>
             </div>
-          ))}
+          ))
+          )}
         </div>
       </div>
     </div>

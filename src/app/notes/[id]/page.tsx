@@ -14,6 +14,7 @@ import {
   CheckIcon
 } from '@heroicons/react/24/outline'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { InlineFeatureGate } from '@/components/features/FeatureGate'
 import html2pdf from 'html2pdf.js'
 
 interface Note {
@@ -126,7 +127,7 @@ export default function NoteViewPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-accent-obsidian py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto flex items-center justify-center">
+        <div className="mx-auto max-w-7xl flex items-center justify-center">
           <LoadingSpinner />
         </div>
       </div>
@@ -136,7 +137,7 @@ export default function NoteViewPage() {
   if (!note) {
     return (
       <div className="min-h-screen bg-accent-obsidian py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
+        <div className="mx-auto max-w-7xl">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-white mb-4">Note not found</h2>
             <motion.button
@@ -166,7 +167,7 @@ export default function NoteViewPage() {
       </div>
 
       <div className="relative">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div className="flex items-center gap-4">
@@ -235,15 +236,17 @@ export default function NoteViewPage() {
                 <ArrowDownTrayIcon className="h-5 w-5" />
                 Download
               </motion.button>
-              <motion.button
-                onClick={handleGenerateQuiz}
-                className="flex items-center gap-2 px-4 py-2 bg-accent-neon text-black rounded-lg hover:bg-accent-neon/90 transition-colors"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <AcademicCapIcon className="h-5 w-5" />
-                Generate Quiz
-              </motion.button>
+              <InlineFeatureGate featureKey="ai_quiz_generation">
+                <motion.button
+                  onClick={handleGenerateQuiz}
+                  className="flex items-center gap-2 px-4 py-2 bg-accent-neon text-black rounded-lg hover:bg-accent-neon/90 transition-colors"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <AcademicCapIcon className="h-5 w-5" />
+                  Generate Quiz
+                </motion.button>
+              </InlineFeatureGate>
               <motion.button
                 onClick={handleTakeQuiz}
                 className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-black rounded-lg hover:bg-accent-gold/90 transition-colors"

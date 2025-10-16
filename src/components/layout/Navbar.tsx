@@ -6,6 +6,7 @@ import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
+import { useSeoSettings } from '@/hooks/useSeoSettings'
 
 const navigation = [
   { name: 'Home', href: '/' },
@@ -22,6 +23,10 @@ function classNames(...classes: string[]) {
 export default function Navbar() {
   const pathname = usePathname()
   const { data: session } = useSession()
+  const { seoSettings } = useSeoSettings()
+  
+  // Debug SEO settings
+  console.log('Navbar SEO Settings:', seoSettings)
 
   return (
     <Disclosure as="nav" className="bg-accent-obsidian border-b border-accent-silver/10 relative z-50">
@@ -31,8 +36,22 @@ export default function Navbar() {
             <div className="flex justify-between items-center gap-4">
               {/* Left section - Logo */}
               <div className="bg-glass backdrop-blur-sm px-4 py-2 rounded-full shadow-neon">
-                <Link href="/" className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-accent-gold to-accent-neon">
-                  AIFlash
+                <Link href="/" className="flex items-center">
+                  {seoSettings?.logoUrl ? (
+                    <img
+                      src={seoSettings.logoUrl}
+                      alt="Logo"
+                      className="h-8 w-auto object-contain"
+                      onError={(e) => {
+                        console.error('Logo failed to load:', seoSettings.logoUrl);
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-accent-gold to-accent-neon">
+                      {seoSettings?.siteName || 'FlashCard App'}
+                    </div>
+                  )}
                 </Link>
               </div>
 

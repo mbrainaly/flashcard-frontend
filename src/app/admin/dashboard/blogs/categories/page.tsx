@@ -12,6 +12,7 @@ import {
   SwatchIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
 import Link from 'next/link'
 
 interface BlogCategory {
@@ -36,10 +37,13 @@ interface CategoryFormData {
 
 export default function CategoriesManagementPage() {
   const { hasPermission } = useAdminAuth()
+  const { get, post, put, delete: deleteRequest } = useAdminApi()
   const [categories, setCategories] = useState<BlogCategory[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState<BlogCategory | null>(null)
+  const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<CategoryFormData>({
     name: '',
     slug: '',
@@ -65,74 +69,25 @@ export default function CategoriesManagementPage() {
     const fetchCategories = async () => {
       try {
         setLoading(true)
-        // Mock data for now
-        const mockCategories: BlogCategory[] = [
-          {
-            _id: '1',
-            name: 'Study Tips',
-            slug: 'study-tips',
-            description: 'Effective techniques and strategies for better learning',
-            color: '#3B82F6',
-            postCount: 15,
-            isActive: true,
-            createdAt: '2024-01-01T00:00:00Z',
-            updatedAt: '2024-01-15T10:30:00Z'
-          },
-          {
-            _id: '2',
-            name: 'Learning Science',
-            slug: 'learning-science',
-            description: 'Research-backed insights into how we learn and remember',
-            color: '#10B981',
-            postCount: 8,
-            isActive: true,
-            createdAt: '2024-01-02T00:00:00Z',
-            updatedAt: '2024-01-12T14:20:00Z'
-          },
-          {
-            _id: '3',
-            name: 'Productivity',
-            slug: 'productivity',
-            description: 'Tools and methods to maximize your learning efficiency',
-            color: '#F59E0B',
-            postCount: 12,
-            isActive: true,
-            createdAt: '2024-01-03T00:00:00Z',
-            updatedAt: '2024-01-18T09:15:00Z'
-          },
-          {
-            _id: '4',
-            name: 'Technology',
-            slug: 'technology',
-            description: 'Latest tech trends and tools for modern learning',
-            color: '#8B5CF6',
-            postCount: 6,
-            isActive: true,
-            createdAt: '2024-01-04T00:00:00Z',
-            updatedAt: '2024-01-10T16:45:00Z'
-          },
-          {
-            _id: '5',
-            name: 'Archived Category',
-            slug: 'archived-category',
-            description: 'This category is no longer active',
-            color: '#6B7280',
-            postCount: 3,
-            isActive: false,
-            createdAt: '2023-12-01T00:00:00Z',
-            updatedAt: '2024-01-05T12:00:00Z'
-          }
-        ]
-        setCategories(mockCategories)
+        setError(null)
+        
+        const response = await get('/api/admin/blogs/categories')
+        
+        if (response.success) {
+          setCategories(response.data)
+        } else {
+          setError(response.message || 'Failed to fetch categories')
+        }
       } catch (error) {
         console.error('Error fetching categories:', error)
+        setError('Failed to load categories')
       } finally {
         setLoading(false)
       }
     }
 
     fetchCategories()
-  }, [])
+  }, [get])
 
   const generateSlug = (name: string) => {
     return name
@@ -179,30 +134,39 @@ export default function CategoriesManagementPage() {
     e.preventDefault()
     
     try {
+      setSaving(true)
+      setError(null)
+      
       if (editingCategory) {
         // Update existing category
-        console.log('Updating category:', editingCategory._id, formData)
-        setCategories(prev => prev.map(cat => 
-          cat._id === editingCategory._id 
-            ? { ...cat, ...formData, updatedAt: new Date().toISOString() }
-            : cat
-        ))
+        const response = await put(`/api/admin/blogs/categories/${editingCategory._id}`, formData)
+        
+        if (response.success) {
+          setCategories(prev => prev.map(cat => 
+            cat._id === editingCategory._id 
+              ? { ...cat, ...formData, updatedAt: new Date().toISOString() }
+              : cat
+          ))
+          setShowModal(false)
+        } else {
+          setError(response.message || 'Failed to update category')
+        }
       } else {
         // Create new category
-        console.log('Creating category:', formData)
-        const newCategory: BlogCategory = {
-          _id: Date.now().toString(),
-          ...formData,
-          postCount: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+        const response = await post('/api/admin/blogs/categories', formData)
+        
+        if (response.success) {
+          setCategories(prev => [...prev, response.data])
+          setShowModal(false)
+        } else {
+          setError(response.message || 'Failed to create category')
         }
-        setCategories(prev => [...prev, newCategory])
       }
-      
-      setShowModal(false)
     } catch (error) {
       console.error('Error saving category:', error)
+      setError('Failed to save category')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -218,10 +182,16 @@ export default function CategoriesManagementPage() {
     if (!confirm(`Are you sure you want to delete the category "${category.name}"?`)) return
 
     try {
-      console.log('Deleting category:', categoryId)
-      setCategories(prev => prev.filter(cat => cat._id !== categoryId))
+      const response = await deleteRequest(`/api/admin/blogs/categories/${categoryId}`)
+      
+      if (response.success) {
+        setCategories(prev => prev.filter(cat => cat._id !== categoryId))
+      } else {
+        setError(response.message || 'Failed to delete category')
+      }
     } catch (error) {
       console.error('Error deleting category:', error)
+      setError('Failed to delete category')
     }
   }
 
@@ -283,6 +253,35 @@ export default function CategoriesManagementPage() {
           </button>
         </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <XMarkIcon className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                Error
+              </h3>
+              <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                {error}
+              </div>
+            </div>
+            <div className="ml-auto pl-3">
+              <div className="-mx-1.5 -my-1.5">
+                <button
+                  onClick={() => setError(null)}
+                  className="inline-flex bg-red-50 dark:bg-red-900/20 rounded-md p-1.5 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Categories Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -394,6 +393,15 @@ export default function CategoriesManagementPage() {
               </button>
             </div>
 
+            {/* Modal Error Display */}
+            {error && (
+              <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                <div className="text-sm text-red-700 dark:text-red-300">
+                  {error}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-accent-silver mb-2">
@@ -485,9 +493,13 @@ export default function CategoriesManagementPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors"
+                  disabled={saving}
+                  className="px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingCategory ? 'Update Category' : 'Create Category'}
+                  {saving 
+                    ? (editingCategory ? 'Updating...' : 'Creating...') 
+                    : (editingCategory ? 'Update Category' : 'Create Category')
+                  }
                 </button>
               </div>
             </form>

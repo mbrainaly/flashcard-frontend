@@ -24,11 +24,15 @@ export default function LineChart({
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
-    if (!canvasRef.current || !data.length) return
+    if (!canvasRef.current || !data || !data.length) return
 
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+
+    // Validate data structure
+    const validData = data.filter(item => item && item[xKey] && yKeys.some(key => item[key] !== undefined))
+    if (validData.length === 0) return
 
     // Set canvas size
     const rect = canvas.getBoundingClientRect()
@@ -45,11 +49,11 @@ export default function LineChart({
     const chartHeight = height - padding.top - padding.bottom
 
     // Get data ranges
-    const xValues = data.map(d => new Date(d[xKey]).getTime())
+    const xValues = validData.map(d => new Date(d[xKey]).getTime())
     const xMin = Math.min(...xValues)
     const xMax = Math.max(...xValues)
 
-    const allYValues = yKeys.flatMap(key => data.map(d => d[key]))
+    const allYValues = yKeys.flatMap(key => validData.map(d => d[key] || 0))
     const yMin = Math.min(...allYValues)
     const yMax = Math.max(...allYValues)
     const yRange = yMax - yMin
@@ -110,13 +114,16 @@ export default function LineChart({
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
 
-    const labelCount = Math.min(6, data.length)
+    const labelCount = Math.min(6, validData.length)
     for (let i = 0; i < labelCount; i++) {
-      const dataIndex = Math.floor((i / (labelCount - 1)) * (data.length - 1))
-      const date = new Date(data[dataIndex][xKey])
-      const x = getX(date.getTime())
-      const label = date.toLocaleDateString('en', { month: 'short', day: 'numeric' })
-      ctx.fillText(label, x, padding.top + chartHeight + 10)
+      const dataIndex = Math.floor((i / (labelCount - 1)) * (validData.length - 1))
+      const dataPoint = validData[dataIndex]
+      if (dataPoint && dataPoint[xKey]) {
+        const date = new Date(dataPoint[xKey])
+        const x = getX(date.getTime())
+        const label = date.toLocaleDateString('en', { month: 'short', day: 'numeric' })
+        ctx.fillText(label, x, padding.top + chartHeight + 10)
+      }
     }
 
     // Draw lines
@@ -127,31 +134,47 @@ export default function LineChart({
       ctx.lineJoin = 'round'
 
       ctx.beginPath()
-      data.forEach((point, index) => {
-        const x = getX(new Date(point[xKey]).getTime())
-        const y = getY(point[yKey])
+      validData.forEach((point, index) => {
+        if (point && point[xKey] && point[yKey] !== undefined) {
+          const x = getX(new Date(point[xKey]).getTime())
+          const y = getY(point[yKey] || 0)
 
-        if (index === 0) {
-          ctx.moveTo(x, y)
-        } else {
-          ctx.lineTo(x, y)
+          if (index === 0) {
+            ctx.moveTo(x, y)
+          } else {
+            ctx.lineTo(x, y)
+          }
         }
       })
       ctx.stroke()
 
       // Draw points
       ctx.fillStyle = colors[keyIndex] || '#3B82F6'
-      data.forEach(point => {
-        const x = getX(new Date(point[xKey]).getTime())
-        const y = getY(point[yKey])
-        
-        ctx.beginPath()
-        ctx.arc(x, y, 3, 0, 2 * Math.PI)
-        ctx.fill()
+      validData.forEach(point => {
+        if (point && point[xKey] && point[yKey] !== undefined) {
+          const x = getX(new Date(point[xKey]).getTime())
+          const y = getY(point[yKey] || 0)
+          
+          ctx.beginPath()
+          ctx.arc(x, y, 3, 0, 2 * Math.PI)
+          ctx.fill()
+        }
       })
     })
 
   }, [data, xKey, yKeys, colors, height, showGrid])
+
+  // Show empty state if no valid data
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center" style={{ height: `${height}px` }}>
+        <div className="text-center">
+          <p className="text-gray-500 dark:text-accent-silver/70">No data available</p>
+          <p className="text-sm text-gray-400 dark:text-accent-silver/50 mt-1">Chart will appear when data is available</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="relative">

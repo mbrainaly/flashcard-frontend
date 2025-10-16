@@ -15,6 +15,7 @@ import {
   TrashIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
 import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
 
@@ -24,109 +25,124 @@ interface BlogPost {
   slug: string
   excerpt: string
   content: string
-  featuredImage?: string
-  categoryId: string
-  tags: string[]
+  featuredImage?: {
+    url: string
+    alt?: string
+  }
+  categories: Array<{
+    _id: string
+    name: string
+    slug: string
+    color?: string
+  }>
+  tags: Array<{
+    _id: string
+    name: string
+    slug: string
+    color?: string
+  }>
   status: 'draft' | 'published' | 'scheduled' | 'archived'
   publishedAt?: string
   scheduledAt?: string
-  seoTitle: string
-  seoDescription: string
-  allowComments: boolean
-  featured: boolean
+  seo: {
+    title: string
+    description: string
+    keywords?: string[]
+  }
+  settings: {
+    allowComments: boolean
+    featured: boolean
+  }
   views: number
   likes: number
   comments: number
+  readingTime: number
+  author: {
+    adminId: string
+    name: string
+    email: string
+  }
   createdAt: string
   updatedAt: string
 }
 
+interface Category {
+  _id: string
+  name: string
+  slug: string
+  color?: string
+}
+
+interface Tag {
+  _id: string
+  name: string
+  slug: string
+  color?: string
+}
+
 export default function EditBlogPostPage() {
   const { hasPermission } = useAdminAuth()
+  const { get, put, delete: deleteRequest } = useAdminApi()
   const router = useRouter()
   const params = useParams()
   const postId = params.id as string
 
   const [post, setPost] = useState<BlogPost | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [availableTags, setAvailableTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'content' | 'seo' | 'settings'>('content')
-  const [newTag, setNewTag] = useState('')
+  const [selectedTagId, setSelectedTagId] = useState('')
   const [previewMode, setPreviewMode] = useState(false)
-
-  // Mock categories
-  const categories = [
-    { _id: '1', name: 'Study Tips', slug: 'study-tips' },
-    { _id: '2', name: 'Learning Science', slug: 'learning-science' },
-    { _id: '3', name: 'Productivity', slug: 'productivity' },
-    { _id: '4', name: 'Technology', slug: 'technology' }
-  ]
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchPost = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true)
-        // Mock data for now - in real app, fetch by postId
-        const mockPost: BlogPost = {
-          _id: postId,
-          title: 'How to Create Effective Flashcards for Better Learning',
-          slug: 'effective-flashcards-better-learning',
-          excerpt: 'Discover the science-backed techniques for creating flashcards that actually help you remember information long-term.',
-          content: `# How to Create Effective Flashcards for Better Learning
+        setError(null)
+        
+        // Fetch blog post, categories, and tags in parallel
+        const [blogResponse, categoriesResponse, tagsResponse] = await Promise.all([
+          get(`/api/admin/blogs/${postId}`),
+          get('/api/admin/blogs/categories'),
+          get('/api/admin/blogs/tags')
+        ])
 
-Flashcards have been a staple of learning for decades, but not all flashcards are created equal. In this comprehensive guide, we'll explore the science-backed techniques that make flashcards truly effective for long-term retention.
-
-## The Science Behind Effective Flashcards
-
-Research in cognitive psychology has shown that certain principles can dramatically improve the effectiveness of flashcards:
-
-### 1. Active Recall
-Active recall is the practice of actively stimulating memory during the learning process. Instead of simply re-reading information, flashcards force you to retrieve information from memory.
-
-### 2. Spaced Repetition
-Spaced repetition involves reviewing information at increasing intervals. This technique leverages the psychological spacing effect to improve long-term retention.
-
-## Best Practices for Creating Flashcards
-
-### Keep It Simple
-Each flashcard should focus on a single concept or fact. Avoid cramming multiple pieces of information onto one card.
-
-### Use Images When Possible
-Visual memory is powerful. Including relevant images can significantly improve recall.
-
-### Write Clear Questions
-Make sure your questions are unambiguous and have clear, specific answers.
-
-## Conclusion
-
-By following these evidence-based principles, you can create flashcards that truly enhance your learning and retention. Remember, the key is consistency and proper implementation of these techniques.`,
-          featuredImage: '/images/blog/flashcards-guide.jpg',
-          categoryId: '1',
-          tags: ['Learning', 'Memory', 'Study Techniques'],
-          status: 'published',
-          publishedAt: '2024-01-15T10:00:00Z',
-          seoTitle: 'How to Create Effective Flashcards - Complete Guide',
-          seoDescription: 'Learn proven techniques for creating flashcards that improve retention and accelerate learning.',
-          allowComments: true,
-          featured: false,
-          views: 2847,
-          likes: 156,
-          comments: 23,
-          createdAt: '2024-01-10T09:00:00Z',
-          updatedAt: '2024-01-15T10:00:00Z'
+        if (blogResponse.success) {
+          // Map backend data structure to frontend interface
+          const postData = {
+            ...blogResponse.data,
+            settings: {
+              allowComments: blogResponse.data.allowComments ?? true,
+              featured: blogResponse.data.isSticky ?? false
+            }
+          }
+          setPost(postData)
+        } else {
+          setError(blogResponse.message || 'Failed to fetch blog post')
         }
-        setPost(mockPost)
+
+        if (categoriesResponse.success) {
+          setCategories(categoriesResponse.data)
+        }
+
+        if (tagsResponse.success) {
+          setAvailableTags(tagsResponse.data)
+        }
       } catch (error) {
-        console.error('Error fetching post:', error)
+        console.error('Error fetching data:', error)
+        setError('Failed to load blog post data')
       } finally {
         setLoading(false)
       }
     }
 
     if (postId) {
-      fetchPost()
+      fetchData()
     }
-  }, [postId])
+  }, [postId, get])
 
   const generateSlug = (title: string) => {
     return title
@@ -143,53 +159,108 @@ By following these evidence-based principles, you can create flashcards that tru
       ...prev,
       title,
       slug: generateSlug(title),
-      seoTitle: title || prev.seoTitle
+      seo: {
+        ...prev.seo,
+        title: title || prev.seo.title
+      }
     }) : null)
   }
 
   const handleAddTag = () => {
-    if (!post) return
-    if (newTag.trim() && !post.tags.includes(newTag.trim())) {
-      setPost(prev => prev ? ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }) : null)
-      setNewTag('')
-    }
+    if (!post || !selectedTagId) return
+    
+    // Find the selected tag from available tags
+    const selectedTag = availableTags.find(tag => tag._id === selectedTagId)
+    if (!selectedTag) return
+    
+    // Check if tag is already added
+    if (post.tags.some(tag => tag._id === selectedTag._id)) return
+    
+    setPost(prev => prev ? ({
+      ...prev,
+      tags: [...prev.tags, selectedTag]
+    }) : null)
+    setSelectedTagId('')
   }
 
-  const handleRemoveTag = (tagToRemove: string) => {
+  const handleRemoveTag = (tagToRemove: Tag) => {
     if (!post) return
     setPost(prev => prev ? ({
       ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
+      tags: prev.tags.filter(tag => tag._id !== tagToRemove._id)
     }) : null)
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file && post) {
-      // In a real app, you'd upload the file and get a URL
-      const imageUrl = URL.createObjectURL(file)
-      setPost(prev => prev ? ({ ...prev, featuredImage: imageUrl }) : null)
+    if (!file || !post) return
+
+    try {
+      // Create FormData for file upload
+      const formData = new FormData()
+      formData.append('image', file)
+
+      // Upload to S3 via admin API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/blogs/upload-image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: formData
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setPost(prev => prev ? ({ 
+            ...prev, 
+            featuredImage: { url: data.imageUrl, alt: file.name }
+          }) : null)
+        } else {
+          setError(data.message || 'Failed to upload image')
+        }
+      } else {
+        setError('Failed to upload image')
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      setError('Failed to upload image')
     }
   }
 
   const handleSave = async () => {
     if (!post) return
     setSaving(true)
+    setError(null)
 
     try {
-      // Here you would make the API call to update the blog post
-      console.log('Updating blog post:', post)
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Update the updatedAt timestamp
-      setPost(prev => prev ? ({ ...prev, updatedAt: new Date().toISOString() }) : null)
+      const response = await put(`/api/admin/blogs/${post._id}`, {
+        title: post.title,
+        slug: post.slug,
+        excerpt: post.excerpt,
+        content: post.content,
+        featuredImage: post.featuredImage,
+        categories: post.categories.map(cat => cat._id),
+        tags: post.tags.map(tag => tag._id),
+        status: post.status,
+        publishedAt: post.publishedAt,
+        scheduledAt: post.scheduledAt,
+        seo: post.seo,
+        // Map frontend settings object to backend fields
+        allowComments: post.settings?.allowComments ?? true,
+        isSticky: post.settings?.featured ?? false
+      })
+
+      if (response.success) {
+        setPost(prev => prev ? ({ ...prev, updatedAt: new Date().toISOString() }) : null)
+        // Show success message (you might want to add a toast notification)
+        console.log('Blog post updated successfully')
+      } else {
+        setError(response.message || 'Failed to update blog post')
+      }
     } catch (error) {
       console.error('Error updating blog post:', error)
+      setError('Failed to update blog post')
     } finally {
       setSaving(false)
     }
@@ -199,16 +270,16 @@ By following these evidence-based principles, you can create flashcards that tru
     if (!post || !confirm('Are you sure you want to delete this blog post? This action cannot be undone.')) return
 
     try {
-      // Here you would make the API call to delete the blog post
-      console.log('Deleting blog post:', post._id)
+      const response = await deleteRequest(`/api/admin/blogs/${post._id}`)
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      // Redirect to blog management page
-      router.push('/admin/dashboard/blogs')
+      if (response.success) {
+        router.push('/admin/dashboard/blogs')
+      } else {
+        setError(response.message || 'Failed to delete blog post')
+      }
     } catch (error) {
       console.error('Error deleting blog post:', error)
+      setError('Failed to delete blog post')
     }
   }
 
@@ -232,6 +303,26 @@ By following these evidence-based principles, you can create flashcards that tru
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 dark:bg-accent-silver/20 rounded w-1/4 mb-4"></div>
           <div className="h-96 bg-gray-200 dark:bg-accent-silver/20 rounded-xl"></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <DocumentTextIcon className="mx-auto h-12 w-12 text-red-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Error Loading Post</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-accent-silver">
+            {error}
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-accent-neon text-black rounded-lg font-medium hover:bg-accent-neon/90 transition-colors"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     )
@@ -380,10 +471,18 @@ By following these evidence-based principles, you can create flashcards that tru
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Featured Image
                     </label>
-                    {post.featuredImage ? (
+                    {post.featuredImage?.url ? (
                       <div className="relative">
                         <div className="w-full h-48 bg-gray-200 dark:bg-accent-silver/20 rounded-lg overflow-hidden">
-                          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-500"></div>
+                          <img 
+                            src={post.featuredImage.url} 
+                            alt={post.featuredImage.alt || post.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = '/images/blog/default-featured.jpg';
+                            }}
+                          />
                         </div>
                         <button
                           onClick={() => setPost(prev => prev ? ({ ...prev, featuredImage: undefined }) : null)}
@@ -437,12 +536,15 @@ By following these evidence-based principles, you can create flashcards that tru
                     </label>
                     <input
                       type="text"
-                      value={post.seoTitle}
-                      onChange={(e) => setPost(prev => prev ? ({ ...prev, seoTitle: e.target.value }) : null)}
+                      value={post.seo.title}
+                      onChange={(e) => setPost(prev => prev ? ({ 
+                        ...prev, 
+                        seo: { ...prev.seo, title: e.target.value }
+                      }) : null)}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
                     />
                     <p className="mt-1 text-sm text-gray-500 dark:text-accent-silver">
-                      {post.seoTitle.length}/60 characters
+                      {post.seo.title.length}/60 characters
                     </p>
                   </div>
 
@@ -451,13 +553,16 @@ By following these evidence-based principles, you can create flashcards that tru
                       SEO Description
                     </label>
                     <textarea
-                      value={post.seoDescription}
-                      onChange={(e) => setPost(prev => prev ? ({ ...prev, seoDescription: e.target.value }) : null)}
+                      value={post.seo.description}
+                      onChange={(e) => setPost(prev => prev ? ({ 
+                        ...prev, 
+                        seo: { ...prev.seo, description: e.target.value }
+                      }) : null)}
                       rows={4}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
                     />
                     <p className="mt-1 text-sm text-gray-500 dark:text-accent-silver">
-                      {post.seoDescription.length}/160 characters
+                      {post.seo.description.length}/160 characters
                     </p>
                   </div>
                 </div>
@@ -471,8 +576,16 @@ By following these evidence-based principles, you can create flashcards that tru
                         Category *
                       </label>
                       <select
-                        value={post.categoryId}
-                        onChange={(e) => setPost(prev => prev ? ({ ...prev, categoryId: e.target.value }) : null)}
+                        value={post.categories[0]?._id || ''}
+                        onChange={(e) => {
+                          const selectedCategory = categories.find(cat => cat._id === e.target.value)
+                          if (selectedCategory) {
+                            setPost(prev => prev ? ({ 
+                              ...prev, 
+                              categories: [selectedCategory]
+                            }) : null)
+                          }
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
                       >
                         <option value="">Select a category</option>
@@ -519,29 +632,52 @@ By following these evidence-based principles, you can create flashcards that tru
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Tags
                     </label>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <input
-                        type="text"
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                        placeholder="Add a tag..."
-                      />
-                      <button
-                        onClick={handleAddTag}
-                        className="px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors"
-                      >
-                        Add
-                      </button>
-                    </div>
+                    {availableTags.length > 0 ? (
+                      <div className="flex items-center space-x-2 mb-2">
+                        <select
+                          value={selectedTagId}
+                          onChange={(e) => setSelectedTagId(e.target.value)}
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                        >
+                          <option value="">Select a tag...</option>
+                          {availableTags
+                            .filter(tag => !post.tags.some(existingTag => existingTag._id === tag._id))
+                            .map(tag => (
+                              <option key={tag._id} value={tag._id}>
+                                {tag.name}
+                              </option>
+                            ))
+                          }
+                        </select>
+                        <button
+                          onClick={handleAddTag}
+                          disabled={!selectedTagId}
+                          className="px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mb-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                          No tags available. 
+                          <Link 
+                            href="/admin/dashboard/blogs/tags" 
+                            className="ml-1 font-medium underline hover:no-underline"
+                            target="_blank"
+                          >
+                            Create tags first
+                          </Link>
+                        </p>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       {post.tags.map((tag) => (
                         <span
-                          key={tag}
+                          key={tag._id}
                           className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300"
                         >
-                          {tag}
+                          {tag.name}
                           <button
                             onClick={() => handleRemoveTag(tag)}
                             className="ml-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
@@ -557,8 +693,11 @@ By following these evidence-based principles, you can create flashcards that tru
                     <label className="flex items-center">
                       <input
                         type="checkbox"
-                        checked={post.allowComments}
-                        onChange={(e) => setPost(prev => prev ? ({ ...prev, allowComments: e.target.checked }) : null)}
+                        checked={post.settings?.allowComments ?? true}
+                        onChange={(e) => setPost(prev => prev ? ({ 
+                          ...prev, 
+                          settings: { ...prev.settings, allowComments: e.target.checked }
+                        }) : null)}
                         className="rounded border-gray-300 dark:border-accent-silver/20 text-accent-neon focus:ring-accent-neon"
                       />
                       <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Allow comments</span>
@@ -567,8 +706,11 @@ By following these evidence-based principles, you can create flashcards that tru
                     <label className="flex items-center">
                       <input
                         type="checkbox"
-                        checked={post.featured}
-                        onChange={(e) => setPost(prev => prev ? ({ ...prev, featured: e.target.checked }) : null)}
+                        checked={post.settings?.featured ?? false}
+                        onChange={(e) => setPost(prev => prev ? ({ 
+                          ...prev, 
+                          settings: { ...prev.settings, featured: e.target.checked }
+                        }) : null)}
                         className="rounded border-gray-300 dark:border-accent-silver/20 text-accent-neon focus:ring-accent-neon"
                       />
                       <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Featured post</span>
@@ -612,7 +754,13 @@ By following these evidence-based principles, you can create flashcards that tru
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500 dark:text-accent-silver">Reading time:</span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {Math.ceil(post.content.split(/\s+/).length / 200)} min
+                    {post.readingTime || Math.ceil(post.content.split(/\s+/).length / 200)} min
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 dark:text-accent-silver">Author:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {post.author.name}
                   </span>
                 </div>
               </div>

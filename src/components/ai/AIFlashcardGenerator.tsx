@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
 import { DocumentTextIcon, SparklesIcon } from '@heroicons/react/24/outline'
+import PlanLimitToast from '@/components/ui/PlanLimitToast'
 
 const generatorSchema = z.object({
   topic: z.string().min(1, 'Topic is required'),
@@ -38,6 +39,8 @@ export default function AIFlashcardGenerator({
   })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [planLimitError, setPlanLimitError] = useState<any>(null)
+  const [showPlanLimitToast, setShowPlanLimitToast] = useState(false)
 
   const {
     register,
@@ -125,7 +128,21 @@ export default function AIFlashcardGenerator({
       )
 
       if (!response.ok) {
-        throw new Error('Failed to generate flashcards')
+        // Check if it's a plan limit error (403 status)
+        if (response.status === 403) {
+          try {
+            const errorData = await response.text()
+            const errorJson = JSON.parse(errorData)
+            setPlanLimitError(errorJson)
+            setShowPlanLimitToast(true)
+            return // Don't throw error, just show the toast
+          } catch (parseError) {
+            // If JSON parsing fails, treat as regular error
+            throw new Error('Failed to generate flashcards')
+          }
+        } else {
+          throw new Error('Failed to generate flashcards')
+        }
       }
 
       onSuccess()
@@ -250,6 +267,16 @@ export default function AIFlashcardGenerator({
           </p>
         )}
       </form>
+
+      {/* Plan Limit Toast */}
+      <PlanLimitToast
+        error={planLimitError}
+        isVisible={showPlanLimitToast}
+        onClose={() => {
+          setShowPlanLimitToast(false)
+          setPlanLimitError(null)
+        }}
+      />
     </div>
   )
 } 

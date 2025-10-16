@@ -7,6 +7,7 @@ import { SparklesIcon } from '@heroicons/react/24/outline'
 import DeckGrid from '@/components/deck/DeckGrid'
 import CreateDeckModal from '@/components/deck/CreateDeckModal'
 import AIGeneratorModal from '@/components/ai/AIGeneratorModal'
+import PlanLimitToast from '@/components/ui/PlanLimitToast'
 import { IDeck, CreateDeckInput } from '@/types/deck'
 
 export default function FlashcardsPage() {
@@ -16,6 +17,8 @@ export default function FlashcardsPage() {
   const [error, setError] = useState('')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isAIGeneratorOpen, setIsAIGeneratorOpen] = useState(false)
+  const [planLimitError, setPlanLimitError] = useState<any>(null)
+  const [showPlanLimitToast, setShowPlanLimitToast] = useState(false)
   const token = session?.user?.accessToken || ''
 
   useEffect(() => {
@@ -58,7 +61,24 @@ export default function FlashcardsPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to create deck')
+        const errorData = await response.text()
+        
+        // Check if it's a plan limit error (403 status)
+        if (response.status === 403) {
+          try {
+            const errorJson = JSON.parse(errorData)
+            setPlanLimitError(errorJson)
+            setShowPlanLimitToast(true)
+            return // Don't throw error, just show the toast
+          } catch (parseError) {
+            // If JSON parsing fails, treat as regular error
+            console.error('Deck creation failed:', response.status, errorData)
+            throw new Error(`Failed to create deck: ${response.status} ${errorData}`)
+          }
+        } else {
+          console.error('Deck creation failed:', response.status, errorData)
+          throw new Error(`Failed to create deck: ${response.status} ${errorData}`)
+        }
       }
 
       const newDeck = await response.json()
@@ -151,6 +171,16 @@ export default function FlashcardsPage() {
           createNewDeck={true}
         />
       )}
+
+      {/* Plan Limit Toast */}
+      <PlanLimitToast
+        error={planLimitError}
+        isVisible={showPlanLimitToast}
+        onClose={() => {
+          setShowPlanLimitToast(false)
+          setPlanLimitError(null)
+        }}
+      />
     </div>
   )
 } 

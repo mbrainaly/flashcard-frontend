@@ -141,7 +141,7 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
   const router = useRouter()
 
   // API base URL
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+  const API_URL = process.env.NEXT_PUBLIC_API_URL 
 
   // Restore session on mount
   useEffect(() => {

@@ -24,7 +24,7 @@ interface ApiResponse<T = any> {
 
 export const useAdminApi = () => {
   const { accessToken, refreshAccessToken, logout } = useAdminAuth()
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
 
   const makeRequest = useCallback(async <T = any>(
     endpoint: string, 
@@ -129,7 +129,7 @@ export const useAdminApi = () => {
 // Hook for handling file uploads
 export const useAdminFileUpload = () => {
   const { accessToken, refreshAccessToken, logout } = useAdminAuth()
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
 
   const uploadFile = useCallback(async (
     endpoint: string,

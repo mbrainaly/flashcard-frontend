@@ -12,9 +12,11 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   EnvelopeIcon,
-  MapPinIcon
+  MapPinIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
 import Link from 'next/link'
 
 interface ContactPageData {
@@ -70,137 +72,62 @@ interface ContactPageData {
 
 export default function ContactPage() {
   const { hasPermission } = useAdminAuth()
+  const { get, put } = useAdminApi()
   const [pageData, setPageData] = useState<ContactPageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'content' | 'contact' | 'seo' | 'settings'>('content')
 
   useEffect(() => {
     const fetchPageData = async () => {
       try {
         setLoading(true)
-        // Mock data for now
-        const mockData: ContactPageData = {
-          _id: '4',
-          title: 'Contact Us',
-          slug: 'contact',
-          content: `# Contact Us
-
-We'd love to hear from you! Whether you have questions about FlashCard App, need technical support, or want to share feedback, our team is here to help.
-
-## Get in Touch
-
-### Support Team
-For technical support, account issues, or general questions about using FlashCard App:
-- **Email:** support@flashcardapp.com
-- **Response Time:** Within 24 hours
-
-### Sales & Business Inquiries
-For enterprise solutions, partnerships, or business-related questions:
-- **Email:** sales@flashcardapp.com
-- **Phone:** +1 (555) 123-4567
-
-### Press & Media
-For press inquiries, media kits, or interview requests:
-- **Email:** press@flashcardapp.com
-
-## Office Location
-
-**FlashCard App Headquarters**
-123 Learning Street, Suite 456
-San Francisco, CA 94105
-United States
-
-### Business Hours
-- **Monday - Friday:** 9:00 AM - 6:00 PM (PST)
-- **Saturday:** 10:00 AM - 4:00 PM (PST)
-- **Sunday:** Closed
-
-## Frequently Asked Questions
-
-Before reaching out, you might find the answer to your question in our [FAQ section](/faq) or [Help Center](/help).
-
-## Social Media
-
-Stay connected with us on social media for the latest updates, tips, and community discussions:
-
-- **Twitter:** [@FlashCardApp](https://twitter.com/flashcardapp)
-- **LinkedIn:** [FlashCard App](https://linkedin.com/company/flashcardapp)
-- **Facebook:** [FlashCard App](https://facebook.com/flashcardapp)
-
-## Feedback & Suggestions
-
-We're always looking to improve FlashCard App. If you have suggestions for new features or improvements, we'd love to hear from you at feedback@flashcardapp.com.
-
-Thank you for choosing FlashCard App for your learning journey!`,
-          status: 'published',
-          lastModified: '2024-01-10T16:45:00Z',
-          lastModifiedBy: { name: 'Support Team', email: 'support@flashcardapp.com' },
-          seo: {
-            title: 'Contact Us | FlashCard App Support',
-            description: 'Get in touch with FlashCard App support team. Find our contact information, office hours, and multiple ways to reach us for help and support.',
-            keywords: ['contact', 'support', 'help', 'customer service', 'phone', 'email', 'address']
-          },
-          views: 3421,
-          contactInfo: {
-            email: 'support@flashcardapp.com',
-            phone: '+1 (555) 123-4567',
-            address: {
-              street: '123 Learning Street, Suite 456',
-              city: 'San Francisco',
-              state: 'CA',
-              zipCode: '94105',
-              country: 'United States'
-            },
-            businessHours: {
-              monday: '9:00 AM - 6:00 PM',
-              tuesday: '9:00 AM - 6:00 PM',
-              wednesday: '9:00 AM - 6:00 PM',
-              thursday: '9:00 AM - 6:00 PM',
-              friday: '9:00 AM - 6:00 PM',
-              saturday: '10:00 AM - 4:00 PM',
-              sunday: 'Closed'
-            },
-            socialMedia: {
-              twitter: 'https://twitter.com/flashcardapp',
-              linkedin: 'https://linkedin.com/company/flashcardapp',
-              facebook: 'https://facebook.com/flashcardapp',
-              instagram: 'https://instagram.com/flashcardapp'
-            }
-          },
-          formSettings: {
-            enabled: true,
-            emailNotifications: true,
-            autoReply: true,
-            autoReplyMessage: 'Thank you for contacting FlashCard App! We have received your message and will respond within 24 hours.'
-          }
+        setError(null)
+        
+        const response = await get('/api/admin/pages/contact')
+        
+        if (response.success) {
+          setPageData(response.data)
+        } else {
+          setError(response.message || 'Failed to fetch page data')
         }
-        setPageData(mockData)
       } catch (error) {
-        console.error('Error fetching contact page:', error)
+        console.error('Error fetching page data:', error)
+        setError('Failed to load page data')
       } finally {
         setLoading(false)
       }
     }
 
     fetchPageData()
-  }, [])
+  }, [get])
 
   const handleSave = async () => {
     if (!pageData) return
-    setSaving(true)
 
     try {
-      console.log('Updating contact page:', pageData)
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      setPageData(prev => prev ? ({ 
-        ...prev, 
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: { name: 'Current Admin', email: 'admin@flashcardapp.com' }
-      }) : null)
+      setSaving(true)
+      setError(null)
+
+      const response = await put('/api/admin/pages/contact', {
+        title: pageData.title,
+        content: pageData.content,
+        seo: pageData.seo,
+        contactInfo: pageData.contactInfo,
+        formSettings: pageData.formSettings,
+        status: pageData.status
+      })
+
+      if (response.success) {
+        setPageData(response.data)
+        console.log('Page saved successfully!')
+      } else {
+        setError(response.message || 'Failed to save page')
+      }
     } catch (error) {
-      console.error('Error updating contact page:', error)
+      console.error('Error saving page:', error)
+      setError('Failed to save page')
     } finally {
       setSaving(false)
     }
@@ -226,24 +153,30 @@ Thank you for choosing FlashCard App for your learning journey!`,
 
   if (!hasPermission('pages.write')) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <PhoneIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Access Denied</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-accent-silver">
-            You don't have permission to edit the contact page.
-          </p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-accent-silver">You don't have permission to edit pages.</p>
         </div>
       </div>
     )
   }
 
-  if (loading || !pageData) {
+  if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 dark:bg-accent-silver/20 rounded w-1/4 mb-4"></div>
-          <div className="h-96 bg-gray-200 dark:bg-accent-silver/20 rounded-xl"></div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-accent-neon"></div>
+      </div>
+    )
+  }
+
+  if (!pageData) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Page Not Found</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-accent-silver">The contact page could not be loaded.</p>
         </div>
       </div>
     )
@@ -256,17 +189,16 @@ Thank you for choosing FlashCard App for your learning journey!`,
         <div className="flex items-center space-x-4">
           <Link
             href="/admin/dashboard/pages"
-            className="p-2 rounded-lg border border-gray-300 dark:border-accent-silver/20 hover:bg-gray-50 dark:hover:bg-accent-silver/10 transition-colors"
+            className="inline-flex items-center text-accent-silver hover:text-white transition-colors"
           >
-            <ArrowLeftIcon className="w-5 h-5 text-gray-600 dark:text-accent-silver" />
+            <ArrowLeftIcon className="w-4 h-4 mr-2" />
+            Back to Pages
           </Link>
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
-              <PhoneIcon className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Contact Page</h1>
-              <div className="flex items-center space-x-4 mt-1">
+          <div className="border-l border-accent-silver/20 pl-4">
+            <div className="flex items-center space-x-3">
+              <EnvelopeIcon className="w-6 h-6 text-accent-neon" />
+              <div>
+                <h1 className="text-2xl font-bold text-white">{pageData.title}</h1>
                 <p className="text-sm text-gray-500 dark:text-accent-silver">
                   Last updated: {new Date(pageData.lastModified).toLocaleDateString()}
                 </p>
@@ -275,11 +207,14 @@ Thank you for choosing FlashCard App for your learning journey!`,
             </div>
           </div>
         </div>
-        
-        <div className="mt-4 sm:mt-0 flex items-center space-x-4">
+        <div className="flex items-center space-x-3 mt-4 sm:mt-0">
           <button className="inline-flex items-center px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors">
             <EyeIcon className="w-4 h-4 mr-2" />
             Preview
+          </button>
+          <button className="inline-flex items-center px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors">
+            <GlobeAltIcon className="w-4 h-4 mr-2" />
+            View Live
           </button>
           <button
             onClick={handleSave}
@@ -290,6 +225,26 @@ Thank you for choosing FlashCard App for your learning journey!`,
           </button>
         </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="ml-auto text-red-400 hover:text-red-600"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Content */}
@@ -304,9 +259,9 @@ Thank you for choosing FlashCard App for your learning journey!`,
               <nav className="flex space-x-8 px-6">
                 {[
                   { id: 'content', name: 'Content', icon: DocumentTextIcon },
-                  { id: 'contact', name: 'Contact Info', icon: PhoneIcon },
+                  { id: 'contact', name: 'Contact Info', icon: EnvelopeIcon },
                   { id: 'seo', name: 'SEO', icon: GlobeAltIcon },
-                  { id: 'settings', name: 'Form Settings', icon: EnvelopeIcon }
+                  { id: 'settings', name: 'Settings', icon: ClockIcon }
                 ].map((tab) => {
                   const Icon = tab.icon
                   return (
@@ -327,11 +282,12 @@ Thank you for choosing FlashCard App for your learning journey!`,
               </nav>
             </div>
 
+            {/* Tab Content */}
             <div className="p-6">
               {activeTab === 'content' && (
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
                       Page Title
                     </label>
                     <input
@@ -343,8 +299,8 @@ Thank you for choosing FlashCard App for your learning journey!`,
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Content
+                    <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                      Content (Markdown)
                     </label>
                     <textarea
                       value={pageData.content}
@@ -359,31 +315,30 @@ Thank you for choosing FlashCard App for your learning journey!`,
 
               {activeTab === 'contact' && (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
                         Email
                       </label>
                       <input
                         type="email"
                         value={pageData.contactInfo.email}
-                        onChange={(e) => setPageData(prev => prev ? ({ 
-                          ...prev, 
+                        onChange={(e) => setPageData(prev => prev ? ({
+                          ...prev,
                           contactInfo: { ...prev.contactInfo, email: e.target.value }
                         }) : null)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
                       />
                     </div>
-
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
                         Phone
                       </label>
                       <input
                         type="tel"
                         value={pageData.contactInfo.phone}
-                        onChange={(e) => setPageData(prev => prev ? ({ 
-                          ...prev, 
+                        onChange={(e) => setPageData(prev => prev ? ({
+                          ...prev,
                           contactInfo: { ...prev.contactInfo, phone: e.target.value }
                         }) : null)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
@@ -392,59 +347,62 @@ Thank you for choosing FlashCard App for your learning journey!`,
                   </div>
 
                   <div>
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Address</h4>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                      Address
+                    </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Street Address
-                        </label>
-                        <input
-                          type="text"
-                          value={pageData.contactInfo.address.street}
-                          onChange={(e) => setPageData(prev => prev ? ({ 
-                            ...prev, 
-                            contactInfo: { 
-                              ...prev.contactInfo, 
-                              address: { ...prev.contactInfo.address, street: e.target.value }
-                            }
-                          }) : null)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          City
-                        </label>
-                        <input
-                          type="text"
-                          value={pageData.contactInfo.address.city}
-                          onChange={(e) => setPageData(prev => prev ? ({ 
-                            ...prev, 
-                            contactInfo: { 
-                              ...prev.contactInfo, 
-                              address: { ...prev.contactInfo.address, city: e.target.value }
-                            }
-                          }) : null)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          State/Province
-                        </label>
-                        <input
-                          type="text"
-                          value={pageData.contactInfo.address.state}
-                          onChange={(e) => setPageData(prev => prev ? ({ 
-                            ...prev, 
-                            contactInfo: { 
-                              ...prev.contactInfo, 
-                              address: { ...prev.contactInfo.address, state: e.target.value }
-                            }
-                          }) : null)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        placeholder="Street"
+                        value={pageData.contactInfo.address.street}
+                        onChange={(e) => setPageData(prev => prev ? ({
+                          ...prev,
+                          contactInfo: {
+                            ...prev.contactInfo,
+                            address: { ...prev.contactInfo.address, street: e.target.value }
+                          }
+                        }) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                      />
+                      <input
+                        type="text"
+                        placeholder="City"
+                        value={pageData.contactInfo.address.city}
+                        onChange={(e) => setPageData(prev => prev ? ({
+                          ...prev,
+                          contactInfo: {
+                            ...prev.contactInfo,
+                            address: { ...prev.contactInfo.address, city: e.target.value }
+                          }
+                        }) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                      />
+                      <input
+                        type="text"
+                        placeholder="State"
+                        value={pageData.contactInfo.address.state}
+                        onChange={(e) => setPageData(prev => prev ? ({
+                          ...prev,
+                          contactInfo: {
+                            ...prev.contactInfo,
+                            address: { ...prev.contactInfo.address, state: e.target.value }
+                          }
+                        }) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                      />
+                      <input
+                        type="text"
+                        placeholder="ZIP Code"
+                        value={pageData.contactInfo.address.zipCode}
+                        onChange={(e) => setPageData(prev => prev ? ({
+                          ...prev,
+                          contactInfo: {
+                            ...prev.contactInfo,
+                            address: { ...prev.contactInfo.address, zipCode: e.target.value }
+                          }
+                        }) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                      />
                     </div>
                   </div>
                 </div>
@@ -453,14 +411,14 @@ Thank you for choosing FlashCard App for your learning journey!`,
               {activeTab === 'seo' && (
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
                       SEO Title
                     </label>
                     <input
                       type="text"
                       value={pageData.seo.title}
-                      onChange={(e) => setPageData(prev => prev ? ({ 
-                        ...prev, 
+                      onChange={(e) => setPageData(prev => prev ? ({
+                        ...prev,
                         seo: { ...prev.seo, title: e.target.value }
                       }) : null)}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
@@ -468,16 +426,31 @@ Thank you for choosing FlashCard App for your learning journey!`,
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      SEO Description
+                    <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                      Meta Description
                     </label>
                     <textarea
                       value={pageData.seo.description}
-                      onChange={(e) => setPageData(prev => prev ? ({ 
-                        ...prev, 
+                      onChange={(e) => setPageData(prev => prev ? ({
+                        ...prev,
                         seo: { ...prev.seo, description: e.target.value }
                       }) : null)}
-                      rows={4}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                      Keywords (comma-separated)
+                    </label>
+                    <input
+                      type="text"
+                      value={pageData.seo.keywords.join(', ')}
+                      onChange={(e) => setPageData(prev => prev ? ({
+                        ...prev,
+                        seo: { ...prev.seo, keywords: e.target.value.split(',').map(k => k.trim()) }
+                      }) : null)}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
                     />
                   </div>
@@ -487,14 +460,14 @@ Thank you for choosing FlashCard App for your learning journey!`,
               {activeTab === 'settings' && (
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Status
+                    <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                      Page Status
                     </label>
                     <select
                       value={pageData.status}
-                      onChange={(e) => setPageData(prev => prev ? ({ 
-                        ...prev, 
-                        status: e.target.value as any 
+                      onChange={(e) => setPageData(prev => prev ? ({
+                        ...prev,
+                        status: e.target.value as ContactPageData['status']
                       }) : null)}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
                     >
@@ -505,62 +478,71 @@ Thank you for choosing FlashCard App for your learning journey!`,
                   </div>
 
                   <div className="space-y-4">
-                    <label className="flex items-center">
+                    <div className="flex items-center">
                       <input
                         type="checkbox"
+                        id="formEnabled"
                         checked={pageData.formSettings.enabled}
-                        onChange={(e) => setPageData(prev => prev ? ({ 
-                          ...prev, 
+                        onChange={(e) => setPageData(prev => prev ? ({
+                          ...prev,
                           formSettings: { ...prev.formSettings, enabled: e.target.checked }
                         }) : null)}
-                        className="rounded border-gray-300 dark:border-accent-silver/20 text-accent-neon focus:ring-accent-neon"
+                        className="h-4 w-4 text-accent-neon focus:ring-accent-neon border-gray-300 rounded"
                       />
-                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Enable contact form</span>
-                    </label>
+                      <label htmlFor="formEnabled" className="ml-2 block text-sm text-gray-900 dark:text-white">
+                        Enable Contact Form
+                      </label>
+                    </div>
 
-                    <label className="flex items-center">
+                    <div className="flex items-center">
                       <input
                         type="checkbox"
+                        id="emailNotifications"
                         checked={pageData.formSettings.emailNotifications}
-                        onChange={(e) => setPageData(prev => prev ? ({ 
-                          ...prev, 
+                        onChange={(e) => setPageData(prev => prev ? ({
+                          ...prev,
                           formSettings: { ...prev.formSettings, emailNotifications: e.target.checked }
                         }) : null)}
-                        className="rounded border-gray-300 dark:border-accent-silver/20 text-accent-neon focus:ring-accent-neon"
+                        className="h-4 w-4 text-accent-neon focus:ring-accent-neon border-gray-300 rounded"
                       />
-                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Email notifications</span>
-                    </label>
+                      <label htmlFor="emailNotifications" className="ml-2 block text-sm text-gray-900 dark:text-white">
+                        Email Notifications
+                      </label>
+                    </div>
 
-                    <label className="flex items-center">
+                    <div className="flex items-center">
                       <input
                         type="checkbox"
+                        id="autoReply"
                         checked={pageData.formSettings.autoReply}
-                        onChange={(e) => setPageData(prev => prev ? ({ 
-                          ...prev, 
+                        onChange={(e) => setPageData(prev => prev ? ({
+                          ...prev,
                           formSettings: { ...prev.formSettings, autoReply: e.target.checked }
                         }) : null)}
-                        className="rounded border-gray-300 dark:border-accent-silver/20 text-accent-neon focus:ring-accent-neon"
+                        className="h-4 w-4 text-accent-neon focus:ring-accent-neon border-gray-300 rounded"
                       />
-                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Auto-reply message</span>
-                    </label>
-                  </div>
-
-                  {pageData.formSettings.autoReply && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Auto-reply Message
+                      <label htmlFor="autoReply" className="ml-2 block text-sm text-gray-900 dark:text-white">
+                        Auto Reply
                       </label>
-                      <textarea
-                        value={pageData.formSettings.autoReplyMessage}
-                        onChange={(e) => setPageData(prev => prev ? ({ 
-                          ...prev, 
-                          formSettings: { ...prev.formSettings, autoReplyMessage: e.target.value }
-                        }) : null)}
-                        rows={4}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                      />
                     </div>
-                  )}
+
+                    {pageData.formSettings.autoReply && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                          Auto Reply Message
+                        </label>
+                        <textarea
+                          value={pageData.formSettings.autoReplyMessage}
+                          onChange={(e) => setPageData(prev => prev ? ({
+                            ...prev,
+                            formSettings: { ...prev.formSettings, autoReplyMessage: e.target.value }
+                          }) : null)}
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -570,64 +552,29 @@ Thank you for choosing FlashCard App for your learning journey!`,
         {/* Sidebar */}
         <div className="lg:col-span-1">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white dark:bg-accent-obsidian rounded-xl shadow-sm border border-gray-200 dark:border-accent-silver/10 p-6 space-y-6"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="bg-white dark:bg-accent-obsidian rounded-xl shadow-sm border border-gray-200 dark:border-accent-silver/10 p-6"
           >
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Page Statistics</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-accent-silver">Views:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">{pageData.views.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-accent-silver">Form Status:</span>
-                  <span className={`font-medium ${pageData.formSettings.enabled ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {pageData.formSettings.enabled ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Page Info</h3>
+            <div className="space-y-4">
+              <div>
+                <dt className="text-sm font-medium text-gray-500 dark:text-accent-silver">Status</dt>
+                <dd className="mt-1">{getStatusBadge(pageData.status)}</dd>
               </div>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Contact Information</h4>
-              <div className="space-y-2 text-sm text-gray-500 dark:text-accent-silver">
-                <div className="flex items-center">
-                  <EnvelopeIcon className="w-4 h-4 mr-2" />
-                  <span className="text-gray-900 dark:text-white truncate">
-                    {pageData.contactInfo.email}
-                  </span>
-                </div>
-                <div className="flex items-center">
-                  <PhoneIcon className="w-4 h-4 mr-2" />
-                  <span className="text-gray-900 dark:text-white">
-                    {pageData.contactInfo.phone}
-                  </span>
-                </div>
-                <div className="flex items-start">
-                  <MapPinIcon className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-900 dark:text-white">
-                    {pageData.contactInfo.address.city}, {pageData.contactInfo.address.state}
-                  </span>
-                </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500 dark:text-accent-silver">Views</dt>
+                <dd className="mt-1 text-sm text-gray-900 dark:text-white">{pageData.views.toLocaleString()}</dd>
               </div>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Quick Actions</h4>
-              <div className="space-y-2">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="w-full px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button className="w-full px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors">
-                  Test Contact Form
-                </button>
+              <div>
+                <dt className="text-sm font-medium text-gray-500 dark:text-accent-silver">Last Modified</dt>
+                <dd className="mt-1 text-sm text-gray-900 dark:text-white">
+                  {new Date(pageData.lastModified).toLocaleDateString()}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500 dark:text-accent-silver">Modified By</dt>
+                <dd className="mt-1 text-sm text-gray-900 dark:text-white">{pageData.lastModifiedBy.name}</dd>
               </div>
             </div>
           </motion.div>

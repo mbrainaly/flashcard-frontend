@@ -18,6 +18,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
 import { useAdminApi } from '@/hooks/useAdminApi'
+import { useDebounce } from '@/hooks/useDebounce'
 import { useSmartSearch } from '@/hooks/useSmartSearch'
 import SmartSearchBar from '@/components/admin/SmartSearchBar'
 import { showToast } from '@/components/ui/Toast'

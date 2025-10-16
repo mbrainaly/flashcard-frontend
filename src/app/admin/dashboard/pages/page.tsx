@@ -17,19 +17,19 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
 import Link from 'next/link'
 import StatsCard from '@/components/admin/analytics/StatsCard'
 
 interface PageInfo {
   _id: string
-  name: string
-  slug: string
   title: string
-  description: string
+  slug: string
   content: string
   status: 'published' | 'draft' | 'review'
   lastModified: string
   lastModifiedBy: {
+    adminId: string
     name: string
     email: string
   }
@@ -37,172 +37,80 @@ interface PageInfo {
     title: string
     description: string
     keywords: string[]
+    ogImage?: string
+    canonicalUrl?: string
   }
   views: number
   isSystem: boolean
-  icon: any
-  route: string
+  createdAt: string
+  updatedAt: string
 }
 
 interface PageOverview {
   totalPages: number
   publishedPages: number
   draftPages: number
+  reviewPages: number
   totalViews: number
 }
 
 export default function PagesOverviewPage() {
   const { hasPermission } = useAdminAuth()
+  const { get } = useAdminApi()
   const [pages, setPages] = useState<PageInfo[]>([])
   const [overview, setOverview] = useState<PageOverview | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchPages = async () => {
       try {
         setLoading(true)
-        // Mock data for now
-        const mockPages: PageInfo[] = [
-          {
-            _id: '1',
-            name: 'Privacy Policy',
-            slug: 'privacy',
-            title: 'Privacy Policy - FlashCard App',
-            description: 'Our commitment to protecting your privacy and personal data',
-            content: 'Privacy policy content...',
-            status: 'published',
-            lastModified: '2024-01-15T10:30:00Z',
-            lastModifiedBy: { name: 'Admin User', email: 'admin@flashcardapp.com' },
-            seo: {
-              title: 'Privacy Policy | FlashCard App',
-              description: 'Learn how FlashCard App protects your privacy and handles your personal data.',
-              keywords: ['privacy', 'data protection', 'GDPR', 'personal information']
-            },
-            views: 1247,
-            isSystem: true,
-            icon: ShieldCheckIcon,
-            route: '/admin/dashboard/pages/privacy'
-          },
-          {
-            _id: '2',
-            name: 'Terms of Service',
-            slug: 'terms',
-            title: 'Terms of Service - FlashCard App',
-            description: 'Terms and conditions for using our flashcard application',
-            content: 'Terms of service content...',
-            status: 'published',
-            lastModified: '2024-01-12T14:20:00Z',
-            lastModifiedBy: { name: 'Legal Team', email: 'legal@flashcardapp.com' },
-            seo: {
-              title: 'Terms of Service | FlashCard App',
-              description: 'Read our terms and conditions for using FlashCard App services.',
-              keywords: ['terms', 'conditions', 'legal', 'agreement']
-            },
-            views: 892,
-            isSystem: true,
-            icon: DocumentTextIcon,
-            route: '/admin/dashboard/pages/terms'
-          },
-          {
-            _id: '3',
-            name: 'About Us',
-            slug: 'about',
-            title: 'About FlashCard App',
-            description: 'Learn about our mission to revolutionize learning through flashcards',
-            content: 'About us content...',
-            status: 'published',
-            lastModified: '2024-01-18T09:15:00Z',
-            lastModifiedBy: { name: 'Marketing Team', email: 'marketing@flashcardapp.com' },
-            seo: {
-              title: 'About Us | FlashCard App',
-              description: 'Discover the story behind FlashCard App and our mission to improve learning.',
-              keywords: ['about', 'company', 'mission', 'team', 'learning']
-            },
-            views: 2156,
-            isSystem: false,
-            icon: InformationCircleIcon,
-            route: '/admin/dashboard/pages/about'
-          },
-          {
-            _id: '4',
-            name: 'Contact Us',
-            slug: 'contact',
-            title: 'Contact FlashCard App',
-            description: 'Get in touch with our support team and find answers to your questions',
-            content: 'Contact information and form...',
-            status: 'published',
-            lastModified: '2024-01-10T16:45:00Z',
-            lastModifiedBy: { name: 'Support Team', email: 'support@flashcardapp.com' },
-            seo: {
-              title: 'Contact Us | FlashCard App',
-              description: 'Contact FlashCard App support team for help, questions, or feedback.',
-              keywords: ['contact', 'support', 'help', 'customer service']
-            },
-            views: 3421,
-            isSystem: false,
-            icon: PhoneIcon,
-            route: '/admin/dashboard/pages/contact'
-          },
-          {
-            _id: '5',
-            name: 'Features',
-            slug: 'features',
-            title: 'FlashCard App Features',
-            description: 'Explore all the powerful features that make learning effective and fun',
-            content: 'Features overview and details...',
-            status: 'draft',
-            lastModified: '2024-01-19T11:20:00Z',
-            lastModifiedBy: { name: 'Product Team', email: 'product@flashcardapp.com' },
-            seo: {
-              title: 'Features | FlashCard App',
-              description: 'Discover powerful features of FlashCard App for effective learning.',
-              keywords: ['features', 'flashcards', 'learning', 'study tools', 'spaced repetition']
-            },
-            views: 567,
-            isSystem: false,
-            icon: SparklesIcon,
-            route: '/admin/dashboard/pages/features'
-          },
-          {
-            _id: '6',
-            name: 'SEO Settings',
-            slug: 'seo',
-            title: 'SEO Configuration',
-            description: 'Global SEO settings and meta configurations for the application',
-            content: 'SEO configuration data...',
-            status: 'review',
-            lastModified: '2024-01-17T13:30:00Z',
-            lastModifiedBy: { name: 'SEO Specialist', email: 'seo@flashcardapp.com' },
-            seo: {
-              title: 'SEO Management | Admin Panel',
-              description: 'Manage global SEO settings and meta configurations.',
-              keywords: ['SEO', 'meta tags', 'search optimization', 'configuration']
-            },
-            views: 89,
-            isSystem: true,
-            icon: Cog6ToothIcon,
-            route: '/admin/dashboard/pages/seo'
-          }
-        ]
+        setError(null)
 
-        const mockOverview: PageOverview = {
-          totalPages: 6,
-          publishedPages: 4,
-          draftPages: 1,
-          totalViews: 8372
+        // Fetch pages and overview in parallel
+        const [pagesResponse, overviewResponse] = await Promise.all([
+          get('/api/admin/pages'),
+          get('/api/admin/pages/overview')
+        ])
+
+        if (pagesResponse.success) {
+          setPages(pagesResponse.data)
+        } else {
+          setError(pagesResponse.message || 'Failed to fetch pages')
         }
 
-        setPages(mockPages)
-        setOverview(mockOverview)
+        if (overviewResponse.success) {
+          setOverview(overviewResponse.data)
+        } else {
+          setError(overviewResponse.message || 'Failed to fetch overview')
+        }
       } catch (error) {
         console.error('Error fetching pages:', error)
+        setError('Failed to load pages data')
       } finally {
         setLoading(false)
       }
     }
 
     fetchPages()
-  }, [])
+  }, [get])
+
+  const getPageIcon = (slug: string) => {
+    const iconMap: { [key: string]: any } = {
+      'privacy': ShieldCheckIcon,
+      'terms': DocumentTextIcon,
+      'about': InformationCircleIcon,
+      'contact': PhoneIcon,
+      'features': SparklesIcon,
+      'seo': Cog6ToothIcon
+    }
+    return iconMap[slug] || DocumentTextIcon
+  }
+
+  const getPageRoute = (slug: string) => {
+    return `/admin/dashboard/pages/${slug}`
+  }
 
   const getStatusBadge = (status: PageInfo['status']) => {
     const statusConfig = {
@@ -251,6 +159,26 @@ export default function PagesOverviewPage() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-red-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Error Loading Pages</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-accent-silver">
+            {error}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 inline-flex items-center px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -282,7 +210,7 @@ export default function PagesOverviewPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6"
         >
           <StatsCard
             title="Total Pages"
@@ -309,6 +237,14 @@ export default function PagesOverviewPage() {
             color="orange"
           />
           <StatsCard
+            title="Review Pages"
+            value={overview.reviewPages.toString()}
+            change="0"
+            trend="neutral"
+            icon={<ClockIcon className="w-6 h-6" />}
+            color="yellow"
+          />
+          <StatsCard
             title="Total Views"
             value={overview.totalViews.toLocaleString()}
             change="+15.3%"
@@ -327,7 +263,7 @@ export default function PagesOverviewPage() {
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
       >
         {pages.map((page, index) => {
-          const Icon = page.icon
+          const Icon = getPageIcon(page.slug)
           return (
             <motion.div
               key={page._id}
@@ -343,7 +279,7 @@ export default function PagesOverviewPage() {
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {page.name}
+                      {page.title}
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-accent-silver">
                       /{page.slug}
@@ -354,7 +290,7 @@ export default function PagesOverviewPage() {
               </div>
 
               <p className="text-sm text-gray-600 dark:text-accent-silver mb-4 line-clamp-2">
-                {page.description}
+                {page.seo.description}
               </p>
 
               <div className="space-y-3">
@@ -399,7 +335,7 @@ export default function PagesOverviewPage() {
                   </div>
                   {hasPermission('pages.write') && (
                     <Link
-                      href={page.route}
+                      href={getPageRoute(page.slug)}
                       className="inline-flex items-center px-3 py-1 bg-accent-neon hover:bg-accent-neon/90 text-black text-sm font-medium rounded-lg transition-colors"
                     >
                       <PencilIcon className="w-3 h-3 mr-1" />

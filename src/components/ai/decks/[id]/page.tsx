@@ -38,12 +38,15 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [isAIGeneratorModalOpen, setIsAIGeneratorModalOpen] = useState(false)
   const [selectedCard, setSelectedCard] = useState<ICard | null>(null)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [studySessions, setStudySessions] = useState(0)
+  const [accuracyPercentage, setAccuracyPercentage] = useState(0)
   const router = useRouter()
   const token = session?.user?.accessToken || ''
 
   useEffect(() => {
     if (session?.user?.accessToken) {
       fetchDeckAndCards()
+      fetchStudyStats()
     }
   }, [id, session?.user?.accessToken])
 
@@ -78,6 +81,35 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       setError('Failed to load deck. Please try again later.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchStudyStats = async () => {
+    try {
+      // Fetch study statistics for this deck using the new API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/study-sessions/decks/${id}/stats`, {
+        headers: {
+          Authorization: `Bearer ${session?.user?.accessToken}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setStudySessions(data.data.totalSessions || 0)
+          setAccuracyPercentage(data.data.accuracyPercentage || 0)
+        } else {
+          setStudySessions(0)
+          setAccuracyPercentage(0)
+        }
+      } else {
+        setStudySessions(0)
+        setAccuracyPercentage(0)
+      }
+    } catch (err) {
+      console.error('Failed to fetch study stats:', err)
+      setStudySessions(0)
+      setAccuracyPercentage(0)
     }
   }
 
@@ -327,11 +359,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               <p className="text-sm text-accent-silver">Total Cards</p>
             </div>
             <div className="rounded-2xl bg-glass p-6 backdrop-blur-sm ring-1 ring-accent-silver/10">
-              <p className="text-2xl font-bold text-accent-neon">{deck.studyProgress.mastered}</p>
+              <p className="text-2xl font-bold text-accent-neon">{accuracyPercentage}%</p>
               <p className="text-sm text-accent-silver">Mastered</p>
             </div>
             <div className="rounded-2xl bg-glass p-6 backdrop-blur-sm ring-1 ring-accent-silver/10">
-              <p className="text-2xl font-bold text-accent-gold">{deck.studyProgress.learning}</p>
+              <p className="text-2xl font-bold text-accent-gold">{studySessions}</p>
               <p className="text-sm text-accent-silver">Learning</p>
             </div>
             <div className="rounded-2xl bg-glass p-6 backdrop-blur-sm ring-1 ring-accent-silver/10">

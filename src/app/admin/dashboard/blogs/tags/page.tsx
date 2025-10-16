@@ -13,6 +13,7 @@ import {
   FunnelIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
 import Link from 'next/link'
 
 interface BlogTag {
@@ -35,10 +36,13 @@ interface TagFormData {
 
 export default function TagsManagementPage() {
   const { hasPermission } = useAdminAuth()
+  const { get, post, put, delete: deleteRequest } = useAdminApi()
   const [tags, setTags] = useState<BlogTag[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [editingTag, setEditingTag] = useState<BlogTag | null>(null)
+  const [saving, setSaving] = useState(false)
   const [filters, setFilters] = useState({
     search: '',
     status: ''
@@ -54,129 +58,25 @@ export default function TagsManagementPage() {
     const fetchTags = async () => {
       try {
         setLoading(true)
-        // Mock data for now
-        const mockTags: BlogTag[] = [
-          {
-            _id: '1',
-            name: 'Learning',
-            slug: 'learning',
-            description: 'General learning techniques and strategies',
-            postCount: 25,
-            isActive: true,
-            createdAt: '2024-01-01T00:00:00Z',
-            updatedAt: '2024-01-15T10:30:00Z'
-          },
-          {
-            _id: '2',
-            name: 'Memory',
-            slug: 'memory',
-            description: 'Memory improvement and retention techniques',
-            postCount: 18,
-            isActive: true,
-            createdAt: '2024-01-02T00:00:00Z',
-            updatedAt: '2024-01-12T14:20:00Z'
-          },
-          {
-            _id: '3',
-            name: 'Study Techniques',
-            slug: 'study-techniques',
-            description: 'Effective methods for studying and learning',
-            postCount: 22,
-            isActive: true,
-            createdAt: '2024-01-03T00:00:00Z',
-            updatedAt: '2024-01-18T09:15:00Z'
-          },
-          {
-            _id: '4',
-            name: 'Spaced Repetition',
-            slug: 'spaced-repetition',
-            description: 'The science and practice of spaced repetition',
-            postCount: 12,
-            isActive: true,
-            createdAt: '2024-01-04T00:00:00Z',
-            updatedAt: '2024-01-10T16:45:00Z'
-          },
-          {
-            _id: '5',
-            name: 'Psychology',
-            slug: 'psychology',
-            description: 'Psychological aspects of learning and memory',
-            postCount: 8,
-            isActive: true,
-            createdAt: '2024-01-05T00:00:00Z',
-            updatedAt: '2024-01-14T11:20:00Z'
-          },
-          {
-            _id: '6',
-            name: 'Research',
-            slug: 'research',
-            description: 'Academic research and studies on learning',
-            postCount: 15,
-            isActive: true,
-            createdAt: '2024-01-06T00:00:00Z',
-            updatedAt: '2024-01-16T13:30:00Z'
-          },
-          {
-            _id: '7',
-            name: 'Note-taking',
-            slug: 'note-taking',
-            description: 'Effective note-taking strategies and tools',
-            postCount: 10,
-            isActive: true,
-            createdAt: '2024-01-07T00:00:00Z',
-            updatedAt: '2024-01-17T15:45:00Z'
-          },
-          {
-            _id: '8',
-            name: 'Productivity',
-            slug: 'productivity',
-            description: 'Productivity tips and techniques for learners',
-            postCount: 14,
-            isActive: true,
-            createdAt: '2024-01-08T00:00:00Z',
-            updatedAt: '2024-01-19T08:10:00Z'
-          },
-          {
-            _id: '9',
-            name: 'Digital Tools',
-            slug: 'digital-tools',
-            description: 'Digital applications and tools for learning',
-            postCount: 9,
-            isActive: true,
-            createdAt: '2024-01-09T00:00:00Z',
-            updatedAt: '2024-01-13T12:25:00Z'
-          },
-          {
-            _id: '10',
-            name: 'AI',
-            slug: 'ai',
-            description: 'Artificial intelligence in education and learning',
-            postCount: 6,
-            isActive: true,
-            createdAt: '2024-01-10T00:00:00Z',
-            updatedAt: '2024-01-11T14:40:00Z'
-          },
-          {
-            _id: '11',
-            name: 'Deprecated Tag',
-            slug: 'deprecated-tag',
-            description: 'This tag is no longer in use',
-            postCount: 2,
-            isActive: false,
-            createdAt: '2023-12-01T00:00:00Z',
-            updatedAt: '2024-01-05T12:00:00Z'
-          }
-        ]
-        setTags(mockTags)
+        setError(null)
+        
+        const response = await get('/api/admin/blogs/tags')
+        
+        if (response.success) {
+          setTags(response.data)
+        } else {
+          setError(response.message || 'Failed to fetch tags')
+        }
       } catch (error) {
         console.error('Error fetching tags:', error)
+        setError('Failed to load tags')
       } finally {
         setLoading(false)
       }
     }
 
     fetchTags()
-  }, [])
+  }, [get])
 
   const generateSlug = (name: string) => {
     return name
@@ -221,30 +121,39 @@ export default function TagsManagementPage() {
     e.preventDefault()
     
     try {
+      setSaving(true)
+      setError(null)
+      
       if (editingTag) {
         // Update existing tag
-        console.log('Updating tag:', editingTag._id, formData)
-        setTags(prev => prev.map(tag => 
-          tag._id === editingTag._id 
-            ? { ...tag, ...formData, updatedAt: new Date().toISOString() }
-            : tag
-        ))
+        const response = await put(`/api/admin/blogs/tags/${editingTag._id}`, formData)
+        
+        if (response.success) {
+          setTags(prev => prev.map(tag => 
+            tag._id === editingTag._id 
+              ? { ...tag, ...formData, updatedAt: new Date().toISOString() }
+              : tag
+          ))
+          setShowModal(false)
+        } else {
+          setError(response.message || 'Failed to update tag')
+        }
       } else {
         // Create new tag
-        console.log('Creating tag:', formData)
-        const newTag: BlogTag = {
-          _id: Date.now().toString(),
-          ...formData,
-          postCount: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+        const response = await post('/api/admin/blogs/tags', formData)
+        
+        if (response.success) {
+          setTags(prev => [...prev, response.data])
+          setShowModal(false)
+        } else {
+          setError(response.message || 'Failed to create tag')
         }
-        setTags(prev => [...prev, newTag])
       }
-      
-      setShowModal(false)
     } catch (error) {
       console.error('Error saving tag:', error)
+      setError('Failed to save tag')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -260,10 +169,16 @@ export default function TagsManagementPage() {
     if (!confirm(`Are you sure you want to delete the tag "${tag.name}"?`)) return
 
     try {
-      console.log('Deleting tag:', tagId)
-      setTags(prev => prev.filter(tag => tag._id !== tagId))
+      const response = await deleteRequest(`/api/admin/blogs/tags/${tagId}`)
+      
+      if (response.success) {
+        setTags(prev => prev.filter(tag => tag._id !== tagId))
+      } else {
+        setError(response.message || 'Failed to delete tag')
+      }
     } catch (error) {
       console.error('Error deleting tag:', error)
+      setError('Failed to delete tag')
     }
   }
 
@@ -329,6 +244,35 @@ export default function TagsManagementPage() {
           </button>
         </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <XMarkIcon className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                Error
+              </h3>
+              <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                {error}
+              </div>
+            </div>
+            <div className="ml-auto pl-3">
+              <div className="-mx-1.5 -my-1.5">
+                <button
+                  onClick={() => setError(null)}
+                  className="inline-flex bg-red-50 dark:bg-red-900/20 rounded-md p-1.5 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <motion.div
@@ -523,6 +467,15 @@ export default function TagsManagementPage() {
               </button>
             </div>
 
+            {/* Modal Error Display */}
+            {error && (
+              <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                <div className="text-sm text-red-700 dark:text-red-300">
+                  {error}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-accent-silver mb-2">
@@ -589,9 +542,13 @@ export default function TagsManagementPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors"
+                  disabled={saving}
+                  className="px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingTag ? 'Update Tag' : 'Create Tag'}
+                  {saving 
+                    ? (editingTag ? 'Updating...' : 'Creating...') 
+                    : (editingTag ? 'Update Tag' : 'Create Tag')
+                  }
                 </button>
               </div>
             </form>

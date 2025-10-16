@@ -5,6 +5,7 @@ import ToastContainer from '@/components/ui/Toast'
 import { useEffect } from 'react'
 import { showToast } from '@/components/ui/Toast'
 import { fetchWithAuth } from '@/utils/fetchWithAuth'
+import { FeatureAccessProvider } from '@/contexts/FeatureAccessContext'
 
 interface ProvidersProps {
   children: React.ReactNode
@@ -17,8 +18,10 @@ export default function Providers({ children }: ProvidersProps) {
 
   return (
     <SessionProvider refetchOnWindowFocus={false} refetchInterval={0} refetchWhenOffline={false}>
-      {children}
-      <ToastContainer />
+      <FeatureAccessProvider>
+        {children}
+        <ToastContainer />
+      </FeatureAccessProvider>
     </SessionProvider>
   )
 }

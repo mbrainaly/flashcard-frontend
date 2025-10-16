@@ -18,6 +18,7 @@ import AuthModals from '@/components/auth/AuthModals'
 import { motion } from 'framer-motion'
 import AnimatedText from '@/components/ui/AnimatedText'
 import { useRef, useEffect, useState } from 'react'
+import { useSeoSettings } from '@/hooks/useSeoSettings'
 
 // Animation keyframes for the testimonial slider
 const testimonialAnimation = `
@@ -116,6 +117,7 @@ export default function Home() {
     closeLogin,
     closeRegister,
   } = useAuthModals()
+  const { seoSettings } = useSeoSettings()
 
   // Animation states for the AI flashcard generation process
   const [animationStep, setAnimationStep] = useState(0)
@@ -252,7 +254,7 @@ export default function Home() {
               variants={fadeInUp}
               className="mt-4 text-lg leading-7 text-accent-silver"
             >
-              Transform your study experience with AIFlash. Create intelligent flashcards and quizzes instantly,
+              Transform your study experience with {seoSettings?.siteName || 'FlashCard App'}. Create intelligent flashcards and quizzes instantly,
               track your progress, and master any subject with our advanced AI technology.
             </motion.p>
             
@@ -811,7 +813,7 @@ export default function Home() {
             Ready to transform your learning?
           </h2>
           <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-accent-silver">
-            Join thousands of students who are already using AIFlash to achieve their learning goals faster and
+            Join thousands of students who are already using {seoSettings?.siteName || 'FlashCard App'} to achieve their learning goals faster and
             more effectively.
           </p>
           <motion.div 

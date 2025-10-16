@@ -16,6 +16,7 @@ import CardList from '@/components/card/CardList'
 import CardFormModal from '@/components/card/CardFormModal'
 import DeckFormModal from '@/components/deck/DeckFormModal'
 import AIGeneratorModal from '@/components/ai/AIGeneratorModal'
+import FeatureGate, { InlineFeatureGate } from '@/components/features/FeatureGate'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -38,12 +39,15 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [isAIGeneratorModalOpen, setIsAIGeneratorModalOpen] = useState(false)
   const [selectedCard, setSelectedCard] = useState<ICard | null>(null)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [studySessions, setStudySessions] = useState(0)
+  const [accuracyPercentage, setAccuracyPercentage] = useState(0)
   const router = useRouter()
   const token = session?.user?.accessToken || ''
 
   useEffect(() => {
     if (session?.user?.accessToken) {
       fetchDeckAndCards()
+      fetchStudyStats()
     }
   }, [id, session?.user?.accessToken])
 
@@ -78,6 +82,35 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       setError('Failed to load deck. Please try again later.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchStudyStats = async () => {
+    try {
+      // Fetch study statistics for this deck using the new API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/study-sessions/decks/${id}/stats`, {
+        headers: {
+          Authorization: `Bearer ${session?.user?.accessToken}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setStudySessions(data.data.totalSessions || 0)
+          setAccuracyPercentage(data.data.accuracyPercentage || 0)
+        } else {
+          setStudySessions(0)
+          setAccuracyPercentage(0)
+        }
+      } else {
+        setStudySessions(0)
+        setAccuracyPercentage(0)
+      }
+    } catch (err) {
+      console.error('Failed to fetch study stats:', err)
+      setStudySessions(0)
+      setAccuracyPercentage(0)
     }
   }
 
@@ -305,13 +338,13 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
             <div>
               <div className="flex items-center gap-4">
                 <h1 className="text-2xl font-bold text-white">{deck.title}</h1>
-                <Link
+                {/* <Link
                   href={`/decks/${id}/edit`}
                   className="flex items-center gap-2 px-3 py-1.5 text-xs sm:text-sm font-medium text-accent-neon rounded-full ring-1 ring-accent-neon/30 hover:bg-accent-neon/10 transition-colors"
                 >
                   <PencilIcon className="h-4 w-4" />
                   Edit Deck
-                </Link>
+                </Link> */}
               </div>
               <p className="mt-2 text-accent-silver">
                 {deck.description || 'No description'}
@@ -330,16 +363,18 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 Start Study Session
               </motion.button>
 
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleOpenAIGenerator}
-                aria-label="Open AI Generator"
-                className="inline-flex items-center gap-2 rounded-full border border-accent-neon/40 bg-accent-neon/10 px-5 py-2.5 text-sm font-semibold text-accent-neon transition-colors duration-200 hover:bg-accent-neon/15 focus:outline-none focus:ring-2 focus:ring-accent-neon/30"
-              >
-                <SparklesIcon className="h-5 w-5" />
-                AI Generate
-              </motion.button>
+              <InlineFeatureGate featureKey="ai_flashcard_generation">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleOpenAIGenerator}
+                  aria-label="Open AI Generator"
+                  className="inline-flex items-center gap-2 rounded-full border border-accent-neon/40 bg-accent-neon/10 px-5 py-2.5 text-sm font-semibold text-accent-neon transition-colors duration-200 hover:bg-accent-neon/15 focus:outline-none focus:ring-2 focus:ring-accent-neon/30"
+                >
+                  <SparklesIcon className="h-5 w-5" />
+                  AI Generate
+                </motion.button>
+              </InlineFeatureGate>
 
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -361,11 +396,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               <p className="text-sm text-accent-silver">Total Cards</p>
             </div>
             <div className="rounded-2xl bg-glass p-6 backdrop-blur-sm ring-1 ring-accent-silver/10">
-              <p className="text-2xl font-bold text-accent-neon">{deck.studyProgress.mastered}</p>
+              <p className="text-2xl font-bold text-accent-neon">{accuracyPercentage}%</p>
               <p className="text-sm text-accent-silver">Mastered</p>
             </div>
             <div className="rounded-2xl bg-glass p-6 backdrop-blur-sm ring-1 ring-accent-silver/10">
-              <p className="text-2xl font-bold text-accent-gold">{deck.studyProgress.learning}</p>
+              <p className="text-2xl font-bold text-accent-gold">{studySessions}</p>
               <p className="text-sm text-accent-silver">Learning</p>
             </div>
             <div className="rounded-2xl bg-glass p-6 backdrop-blur-sm ring-1 ring-accent-silver/10">
