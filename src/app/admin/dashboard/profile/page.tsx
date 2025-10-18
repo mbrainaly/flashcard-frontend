@@ -18,6 +18,7 @@ import {
   PencilIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
 
 interface AdminProfile {
   _id: string
@@ -25,23 +26,15 @@ interface AdminProfile {
   email: string
   role: string
   avatar?: string
-  phone?: string
   location?: string
-  bio?: string
   joinedAt: string
   lastLogin: string
   permissions: string[]
-  twoFactorEnabled: boolean
-  loginHistory: {
-    date: string
-    ipAddress: string
-    userAgent: string
-    location: string
-  }[]
   activityLog: {
     date: string
     action: string
     details: string
+    ipAddress?: string
   }[]
 }
 
@@ -53,6 +46,7 @@ interface PasswordChangeForm {
 
 export default function AdminProfilePage() {
   const { admin } = useAdminAuth()
+  const { get, put } = useAdminApi()
   const [profile, setProfile] = useState<AdminProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -67,92 +61,55 @@ export default function AdminProfilePage() {
   })
   const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         setLoading(true)
-        // Mock data for now
-        const mockProfile: AdminProfile = {
-          _id: admin?._id || '1',
-          name: admin?.name || 'Super Administrator',
-          email: admin?.email || 'admin@flashcardapp.com',
-          role: admin?.role || 'super_admin',
-          avatar: '/images/admin-avatar.jpg',
-          phone: '+1 (555) 123-4567',
-          location: 'San Francisco, CA',
-          bio: 'Experienced administrator with expertise in educational technology and platform management.',
-          joinedAt: '2023-01-15T10:00:00Z',
-          lastLogin: new Date().toISOString(),
-          permissions: admin?.permissions || [],
-          twoFactorEnabled: true,
-          loginHistory: [
-            {
-              date: new Date().toISOString(),
-              ipAddress: '192.168.1.100',
-              userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-              location: 'San Francisco, CA'
-            },
-            {
-              date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-              ipAddress: '192.168.1.100',
-              userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-              location: 'San Francisco, CA'
-            },
-            {
-              date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-              ipAddress: '10.0.0.50',
-              userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)',
-              location: 'San Francisco, CA'
-            }
-          ],
-          activityLog: [
-            {
-              date: new Date().toISOString(),
-              action: 'Updated user permissions',
-              details: 'Modified permissions for user john@example.com'
-            },
-            {
-              date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-              action: 'Created blog post',
-              details: 'Published new blog post: "Learning Tips for Students"'
-            },
-            {
-              date: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-              action: 'Updated SEO settings',
-              details: 'Modified global SEO configuration'
-            },
-            {
-              date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-              action: 'Logged in',
-              details: 'Successful login from 192.168.1.100'
-            }
-          ]
+        setError(null)
+        
+        const response = await get('/api/admin/profile')
+        
+        if (response.success) {
+          setProfile(response.data)
+        } else {
+          setError(response.message || 'Failed to fetch profile')
         }
-        setProfile(mockProfile)
       } catch (error) {
         console.error('Error fetching profile:', error)
+        setError('Failed to fetch profile')
       } finally {
         setLoading(false)
       }
     }
 
-    fetchProfile()
-  }, [admin])
+    if (admin) {
+      fetchProfile()
+    }
+  }, [admin, get])
 
   const handleProfileUpdate = async () => {
     if (!profile) return
     setSaving(true)
+    setError(null)
 
     try {
-      // Here you would make the API call to update the profile
-      console.log('Updating profile:', profile)
+      const response = await put('/api/admin/profile', {
+        name: profile.name,
+        email: profile.email,
+        location: profile.location
+      })
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
+      if (response.success) {
+        setProfile(response.data)
+        // Show success feedback could be added here
+      } else {
+        setError(response.message || 'Failed to update profile')
+      }
     } catch (error) {
       console.error('Error updating profile:', error)
+      setError('Failed to update profile')
     } finally {
       setSaving(false)
     }
@@ -181,18 +138,21 @@ export default function AdminProfilePage() {
     setSaving(true)
 
     try {
-      // Here you would make the API call to change password
-      console.log('Changing password')
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      setPasswordSuccess(true)
-      setPasswordForm({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
+      const response = await put('/api/admin/profile/password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
       })
+      
+      if (response.success) {
+        setPasswordSuccess(true)
+        setPasswordForm({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        })
+      } else {
+        setPasswordError(response.message || 'Failed to change password')
+      }
     } catch (error) {
       console.error('Error changing password:', error)
       setPasswordError('Failed to change password. Please try again.')
@@ -255,6 +215,16 @@ export default function AdminProfilePage() {
           </p>
         </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <div className="flex">
+            <ExclamationTriangleIcon className="w-5 h-5 text-red-400 mr-2 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Profile Card */}
@@ -373,19 +343,7 @@ export default function AdminProfilePage() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Phone Number
-                      </label>
-                      <input
-                        type="tel"
-                        value={profile.phone || ''}
-                        onChange={(e) => setProfile(prev => prev ? ({ ...prev, phone: e.target.value }) : null)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Location
                       </label>
@@ -394,21 +352,9 @@ export default function AdminProfilePage() {
                         value={profile.location || ''}
                         onChange={(e) => setProfile(prev => prev ? ({ ...prev, location: e.target.value }) : null)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                        placeholder="Your current location"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Bio
-                    </label>
-                    <textarea
-                      value={profile.bio || ''}
-                      onChange={(e) => setProfile(prev => prev ? ({ ...prev, bio: e.target.value }) : null)}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                      placeholder="Tell us about yourself..."
-                    />
                   </div>
 
                   <div className="flex justify-end">
@@ -525,51 +471,6 @@ export default function AdminProfilePage() {
                     </div>
                   </div>
 
-                  {/* Two-Factor Authentication */}
-                  <div className="border-t border-gray-200 dark:border-accent-silver/10 pt-8">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Two-Factor Authentication</h3>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-accent-silver">
-                          Add an extra layer of security to your account
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-accent-silver/70 mt-1">
-                          Status: {profile.twoFactorEnabled ? 'Enabled' : 'Disabled'}
-                        </p>
-                      </div>
-                      <button
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                          profile.twoFactorEnabled
-                            ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/30'
-                            : 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/30'
-                        }`}
-                      >
-                        {profile.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Login History */}
-                  <div className="border-t border-gray-200 dark:border-accent-silver/10 pt-8">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Login History</h3>
-                    <div className="space-y-3">
-                      {profile.loginHistory.slice(0, 5).map((login, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-accent-silver/5 rounded-lg">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {new Date(login.date).toLocaleDateString()} at {new Date(login.date).toLocaleTimeString()}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-accent-silver">
-                              {login.ipAddress} • {login.location}
-                            </p>
-                          </div>
-                          <div className="text-xs text-gray-400 dark:text-accent-silver/70">
-                            {login.userAgent.includes('iPhone') ? '📱' : '💻'}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               )}
 

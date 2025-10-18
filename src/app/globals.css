@@ -1,20 +1,60 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 :root {
-    --background: #0A0A0A;
+    --background: #ffffff;
     --foreground: #171717;
 }
 
-@media (prefers-color-scheme: dark) {
-     :root {
-        --background: #0a0a0a;
-        --foreground: #ededed;
-    }
+.dark {
+    --background: #0a0a0a;
+    --foreground: #ededed;
 }
 
 body {
     color: var(--foreground);
     background: var(--background);
     font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Hide scrollbars for admin layout */
+.admin-layout {
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.admin-layout::-webkit-scrollbar {
+    display: none; /* Safari and Chrome */
+}
+
+/* Hide scrollbars for all elements within admin layout */
+.admin-layout * {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.admin-layout *::-webkit-scrollbar {
+    display: none; /* Safari and Chrome */
+}
+
+/* Ensure scrolling still works */
+.admin-scrollable {
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.admin-scrollable::-webkit-scrollbar {
+    display: none;
+}
+
+/* Text wrapping for long content */
+.text-wrap-anywhere {
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    hyphens: auto;
 }

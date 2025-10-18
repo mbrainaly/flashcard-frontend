@@ -68,7 +68,7 @@ export const useAdminApi = () => {
           const newToken = localStorage.getItem('adminToken')
           if (newToken) {
             requestHeaders['Authorization'] = `Bearer ${newToken}`
-            const retryResponse = await fetch(`${API_URL}${endpoint}`, {
+            const retryResponse = await fetch(`${API_URL}/api${endpoint}`, {
               ...config,
               headers: requestHeaders
             })
@@ -170,7 +170,7 @@ export const useAdminFileUpload = () => {
           const newToken = localStorage.getItem('adminToken')
           if (newToken) {
             requestHeaders['Authorization'] = `Bearer ${newToken}`
-            const retryResponse = await fetch(`${API_URL}${endpoint}`, {
+            const retryResponse = await fetch(`${API_URL}/api${endpoint}`, {
               method: 'POST',
               headers: requestHeaders,
               body: formData

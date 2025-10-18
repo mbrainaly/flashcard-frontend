@@ -15,7 +15,9 @@ import {
   Cog6ToothIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  Bars3BottomLeftIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
 
@@ -95,6 +97,18 @@ const menuItems: MenuItem[] = [
     href: '/admin/dashboard/pages',
     icon: DocumentIcon,
     permissions: ['pages.read']
+  },
+  {
+    name: 'Footer Menu',
+    href: '/admin/dashboard/footer',
+    icon: Bars3BottomLeftIcon,
+    permissions: ['pages.read']
+  },
+  {
+    name: 'Queries',
+    href: '/admin/dashboard/queries',
+    icon: ChatBubbleLeftRightIcon,
+    permissions: ['queries.read']
   },
   {
     name: 'Settings',
@@ -197,7 +211,7 @@ export default function AdminSidebar({ collapsed = false, onToggle }: AdminSideb
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+        <nav className="admin-scrollable flex-1 overflow-y-auto p-4 space-y-2">
           {filteredMenuItems.map((item) => (
             <div key={item.name}>
               {/* Main menu item */}

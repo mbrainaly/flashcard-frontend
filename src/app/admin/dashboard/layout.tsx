@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { AdminAuthProvider, useAdminAuth } from '@/contexts/AdminAuthContext'
+import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import AdminHeader from '@/components/admin/AdminHeader'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -76,7 +77,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-accent-obsidian flex">
+    <div className="admin-layout min-h-screen bg-gray-50 dark:bg-accent-obsidian flex">
       {/* Sidebar */}
       <div className="flex-shrink-0">
         <AdminSidebar 
@@ -96,7 +97,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
         </div>
         
         {/* Page Content */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto">
+        <main className="admin-scrollable flex-1 overflow-x-hidden overflow-y-auto">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {children}
           </div>
@@ -108,8 +109,10 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
-    <AdminAuthProvider>
-      <AdminLayoutContent>{children}</AdminLayoutContent>
-    </AdminAuthProvider>
+    <ThemeProvider>
+      <AdminAuthProvider>
+        <AdminLayoutContent>{children}</AdminLayoutContent>
+      </AdminAuthProvider>
+    </ThemeProvider>
   )
 }

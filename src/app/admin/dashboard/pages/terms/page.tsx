@@ -6,7 +6,6 @@ import {
   ArrowLeftIcon,
   DocumentTextIcon,
   EyeIcon,
-  GlobeAltIcon,
   ClockIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -47,7 +46,6 @@ export default function TermsOfServicePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'content' | 'seo' | 'settings'>('content')
-  const [previewMode, setPreviewMode] = useState(false)
 
   useEffect(() => {
     const fetchPageData = async () => {
@@ -195,15 +193,11 @@ export default function TermsOfServicePage() {
         
         <div className="mt-4 sm:mt-0 flex items-center space-x-4">
           <button
-            onClick={() => setPreviewMode(!previewMode)}
+            onClick={() => window.open('/terms', '_blank')}
             className="inline-flex items-center px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors"
           >
             <EyeIcon className="w-4 h-4 mr-2" />
-            {previewMode ? 'Edit' : 'Preview'}
-          </button>
-          <button className="inline-flex items-center px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors">
-            <GlobeAltIcon className="w-4 h-4 mr-2" />
-            View Live
+            Preview
           </button>
           <button
             onClick={handleSave}
@@ -228,7 +222,7 @@ export default function TermsOfServicePage() {
               <nav className="flex space-x-8 px-6">
                 {[
                   { id: 'content', name: 'Content', icon: DocumentTextIcon },
-                  { id: 'seo', name: 'SEO', icon: GlobeAltIcon },
+                  { id: 'seo', name: 'SEO', icon: DocumentTextIcon },
                   { id: 'settings', name: 'Legal Settings', icon: ScaleIcon }
                 ].map((tab) => {
                   const Icon = tab.icon

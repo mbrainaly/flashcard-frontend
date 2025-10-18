@@ -6,6 +6,7 @@ import { useEffect } from 'react'
 import { showToast } from '@/components/ui/Toast'
 import { fetchWithAuth } from '@/utils/fetchWithAuth'
 import { FeatureAccessProvider } from '@/contexts/FeatureAccessContext'
+import { ThemeProvider } from '@/components/providers/ThemeProvider'
 
 interface ProvidersProps {
   children: React.ReactNode
@@ -18,10 +19,12 @@ export default function Providers({ children }: ProvidersProps) {
 
   return (
     <SessionProvider refetchOnWindowFocus={false} refetchInterval={0} refetchWhenOffline={false}>
-      <FeatureAccessProvider>
-        {children}
-        <ToastContainer />
-      </FeatureAccessProvider>
+      <ThemeProvider>
+        <FeatureAccessProvider>
+          {children}
+          <ToastContainer />
+        </FeatureAccessProvider>
+      </ThemeProvider>
     </SessionProvider>
   )
 }

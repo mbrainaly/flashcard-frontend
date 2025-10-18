@@ -77,7 +77,7 @@ export default function ContactPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'content' | 'contact' | 'seo' | 'settings'>('content')
+  const [activeTab, setActiveTab] = useState<'hero' | 'contact' | 'hours' | 'social' | 'seo'>('hero')
 
   useEffect(() => {
     const fetchPageData = async () => {
@@ -189,16 +189,16 @@ export default function ContactPage() {
         <div className="flex items-center space-x-4">
           <Link
             href="/admin/dashboard/pages"
-            className="inline-flex items-center text-accent-silver hover:text-white transition-colors"
+            className="inline-flex items-center text-gray-600 dark:text-accent-silver hover:text-gray-900 dark:hover:text-white transition-colors"
           >
             <ArrowLeftIcon className="w-4 h-4 mr-2" />
             Back to Pages
           </Link>
-          <div className="border-l border-accent-silver/20 pl-4">
+          <div className="border-l border-gray-200 dark:border-accent-silver/20 pl-4">
             <div className="flex items-center space-x-3">
               <EnvelopeIcon className="w-6 h-6 text-accent-neon" />
               <div>
-                <h1 className="text-2xl font-bold text-white">{pageData.title}</h1>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{pageData.title}</h1>
                 <p className="text-sm text-gray-500 dark:text-accent-silver">
                   Last updated: {new Date(pageData.lastModified).toLocaleDateString()}
                 </p>
@@ -208,13 +208,12 @@ export default function ContactPage() {
           </div>
         </div>
         <div className="flex items-center space-x-3 mt-4 sm:mt-0">
-          <button className="inline-flex items-center px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors">
+          <button
+            onClick={() => window.open('/contact', '_blank')}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-accent-silver/30 text-gray-700 dark:text-accent-silver/80 rounded-lg hover:bg-gray-50 dark:hover:bg-accent-silver/10 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
             <EyeIcon className="w-4 h-4 mr-2" />
             Preview
-          </button>
-          <button className="inline-flex items-center px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors">
-            <GlobeAltIcon className="w-4 h-4 mr-2" />
-            View Live
           </button>
           <button
             onClick={handleSave}
@@ -258,10 +257,11 @@ export default function ContactPage() {
             <div className="border-b border-gray-200 dark:border-accent-silver/10">
               <nav className="flex space-x-8 px-6">
                 {[
-                  { id: 'content', name: 'Content', icon: DocumentTextIcon },
+                  { id: 'hero', name: 'Hero Section', icon: DocumentTextIcon },
                   { id: 'contact', name: 'Contact Info', icon: EnvelopeIcon },
-                  { id: 'seo', name: 'SEO', icon: GlobeAltIcon },
-                  { id: 'settings', name: 'Settings', icon: ClockIcon }
+                  { id: 'hours', name: 'Business Hours', icon: ClockIcon },
+                  { id: 'social', name: 'Social Media', icon: GlobeAltIcon },
+                  { id: 'seo', name: 'SEO', icon: CheckCircleIcon }
                 ].map((tab) => {
                   const Icon = tab.icon
                   return (
@@ -284,31 +284,37 @@ export default function ContactPage() {
 
             {/* Tab Content */}
             <div className="p-6">
-              {activeTab === 'content' && (
+              {activeTab === 'hero' && (
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
-                      Page Title
-                    </label>
-                    <input
-                      type="text"
-                      value={pageData.title}
-                      onChange={(e) => setPageData(prev => prev ? ({ ...prev, title: e.target.value }) : null)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                    />
-                  </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Hero Section</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                          Hero Title
+                        </label>
+                        <input
+                          type="text"
+                          value={pageData.title}
+                          onChange={(e) => setPageData(prev => prev ? ({ ...prev, title: e.target.value }) : null)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="Contact Us"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
-                      Content (Markdown)
-                    </label>
-                    <textarea
-                      value={pageData.content}
-                      onChange={(e) => setPageData(prev => prev ? ({ ...prev, content: e.target.value }) : null)}
-                      rows={20}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent font-mono text-sm"
-                      placeholder="Enter contact page content (Markdown supported)..."
-                    />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                          Hero Description
+                        </label>
+                        <textarea
+                          value={pageData.content}
+                          onChange={(e) => setPageData(prev => prev ? ({ ...prev, content: e.target.value }) : null)}
+                          rows={4}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="Get in touch with our support team and find answers to your questions."
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -408,6 +414,136 @@ export default function ContactPage() {
                 </div>
               )}
 
+              {activeTab === 'hours' && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Business Hours</h3>
+                    <div className="space-y-4">
+                      {Object.entries(pageData.contactInfo.businessHours).map(([day, hours]) => (
+                        <div key={day} className="flex items-center space-x-4">
+                          <label className="w-24 text-sm font-medium text-gray-700 dark:text-accent-silver capitalize">
+                            {day}:
+                          </label>
+                          <input
+                            type="text"
+                            value={hours}
+                            onChange={(e) => setPageData(prev => prev ? ({
+                              ...prev,
+                              contactInfo: {
+                                ...prev.contactInfo,
+                                businessHours: {
+                                  ...prev.contactInfo.businessHours,
+                                  [day]: e.target.value
+                                }
+                              }
+                            }) : null)}
+                            className="flex-1 px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                            placeholder="9:00 AM - 5:00 PM"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'social' && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Social Media Links</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                          Twitter URL
+                        </label>
+                        <input
+                          type="url"
+                          value={pageData.contactInfo.socialMedia.twitter || ''}
+                          onChange={(e) => setPageData(prev => prev ? ({
+                            ...prev,
+                            contactInfo: {
+                              ...prev.contactInfo,
+                              socialMedia: {
+                                ...prev.contactInfo.socialMedia,
+                                twitter: e.target.value
+                              }
+                            }
+                          }) : null)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="https://twitter.com/yourcompany"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                          Facebook URL
+                        </label>
+                        <input
+                          type="url"
+                          value={pageData.contactInfo.socialMedia.facebook || ''}
+                          onChange={(e) => setPageData(prev => prev ? ({
+                            ...prev,
+                            contactInfo: {
+                              ...prev.contactInfo,
+                              socialMedia: {
+                                ...prev.contactInfo.socialMedia,
+                                facebook: e.target.value
+                              }
+                            }
+                          }) : null)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="https://facebook.com/yourcompany"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                          LinkedIn URL
+                        </label>
+                        <input
+                          type="url"
+                          value={pageData.contactInfo.socialMedia.linkedin || ''}
+                          onChange={(e) => setPageData(prev => prev ? ({
+                            ...prev,
+                            contactInfo: {
+                              ...prev.contactInfo,
+                              socialMedia: {
+                                ...prev.contactInfo.socialMedia,
+                                linkedin: e.target.value
+                              }
+                            }
+                          }) : null)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="https://linkedin.com/company/yourcompany"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
+                          Instagram URL
+                        </label>
+                        <input
+                          type="url"
+                          value={pageData.contactInfo.socialMedia.instagram || ''}
+                          onChange={(e) => setPageData(prev => prev ? ({
+                            ...prev,
+                            contactInfo: {
+                              ...prev.contactInfo,
+                              socialMedia: {
+                                ...prev.contactInfo.socialMedia,
+                                instagram: e.target.value
+                              }
+                            }
+                          }) : null)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                          placeholder="https://instagram.com/yourcompany"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {activeTab === 'seo' && (
                 <div className="space-y-6">
                   <div>
@@ -457,94 +593,6 @@ export default function ContactPage() {
                 </div>
               )}
 
-              {activeTab === 'settings' && (
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
-                      Page Status
-                    </label>
-                    <select
-                      value={pageData.status}
-                      onChange={(e) => setPageData(prev => prev ? ({
-                        ...prev,
-                        status: e.target.value as ContactPageData['status']
-                      }) : null)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                    >
-                      <option value="draft">Draft</option>
-                      <option value="review">Under Review</option>
-                      <option value="published">Published</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="formEnabled"
-                        checked={pageData.formSettings.enabled}
-                        onChange={(e) => setPageData(prev => prev ? ({
-                          ...prev,
-                          formSettings: { ...prev.formSettings, enabled: e.target.checked }
-                        }) : null)}
-                        className="h-4 w-4 text-accent-neon focus:ring-accent-neon border-gray-300 rounded"
-                      />
-                      <label htmlFor="formEnabled" className="ml-2 block text-sm text-gray-900 dark:text-white">
-                        Enable Contact Form
-                      </label>
-                    </div>
-
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="emailNotifications"
-                        checked={pageData.formSettings.emailNotifications}
-                        onChange={(e) => setPageData(prev => prev ? ({
-                          ...prev,
-                          formSettings: { ...prev.formSettings, emailNotifications: e.target.checked }
-                        }) : null)}
-                        className="h-4 w-4 text-accent-neon focus:ring-accent-neon border-gray-300 rounded"
-                      />
-                      <label htmlFor="emailNotifications" className="ml-2 block text-sm text-gray-900 dark:text-white">
-                        Email Notifications
-                      </label>
-                    </div>
-
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="autoReply"
-                        checked={pageData.formSettings.autoReply}
-                        onChange={(e) => setPageData(prev => prev ? ({
-                          ...prev,
-                          formSettings: { ...prev.formSettings, autoReply: e.target.checked }
-                        }) : null)}
-                        className="h-4 w-4 text-accent-neon focus:ring-accent-neon border-gray-300 rounded"
-                      />
-                      <label htmlFor="autoReply" className="ml-2 block text-sm text-gray-900 dark:text-white">
-                        Auto Reply
-                      </label>
-                    </div>
-
-                    {pageData.formSettings.autoReply && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-accent-silver mb-2">
-                          Auto Reply Message
-                        </label>
-                        <textarea
-                          value={pageData.formSettings.autoReplyMessage}
-                          onChange={(e) => setPageData(prev => prev ? ({
-                            ...prev,
-                            formSettings: { ...prev.formSettings, autoReplyMessage: e.target.value }
-                          }) : null)}
-                          rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </motion.div>
         </div>

@@ -12,6 +12,7 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
+import { useAdminApi } from '@/hooks/useAdminApi'
 
 interface User {
   _id: string
@@ -33,6 +34,24 @@ interface User {
   }
 }
 
+interface SubscriptionPlan {
+  _id: string
+  name: string
+  description: string
+  price: {
+    monthly: number
+    yearly: number
+  }
+  features: {
+    maxDecks: number
+    aiFlashcardCredits: number
+    aiQuizCredits: number
+    aiNotesCredits: number
+    aiAssistantCredits: number
+  }
+  isActive: boolean
+}
+
 interface UserModalProps {
   user: User | null
   isOpen: boolean
@@ -43,7 +62,7 @@ interface UserModalProps {
 interface FormData {
   name: string
   email: string
-  role: 'basic' | 'pro' | 'team'
+  role: string // This will store the plan ID
   isActive: boolean
   password?: string
   confirmPassword?: string
@@ -55,10 +74,11 @@ interface FormData {
 }
 
 export default function UserModal({ user, isOpen, onClose, onSave }: UserModalProps) {
+  const adminApi = useAdminApi()
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
-    role: 'basic',
+    role: '', // Will be set to first available plan ID
     isActive: true,
     password: '',
     confirmPassword: '',
@@ -67,16 +87,67 @@ export default function UserModal({ user, isOpen, onClose, onSave }: UserModalPr
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPasswordFields, setShowPasswordFields] = useState(false)
+  const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(false)
 
   const isEditing = !!user
+
+  // Fetch subscription plans
+  const fetchSubscriptionPlans = async () => {
+    try {
+      setLoadingPlans(true)
+      const response = await adminApi.get('/api/admin/plans')
+      
+      if (response.success && response.data) {
+        // Filter only active plans and sort by price
+        const activePlans = response.data
+          .filter((plan: SubscriptionPlan) => plan.isActive)
+          .sort((a: SubscriptionPlan, b: SubscriptionPlan) => a.price.monthly - b.price.monthly)
+        setSubscriptionPlans(activePlans)
+        
+        // Set default plan for new users (first/cheapest plan)
+        if (!user && activePlans.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            role: activePlans[0]._id
+          }))
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching subscription plans:', error)
+      // Set fallback plans if API fails
+      setSubscriptionPlans([])
+    } finally {
+      setLoadingPlans(false)
+    }
+  }
+
+  // Fetch plans when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchSubscriptionPlans()
+    }
+  }, [isOpen])
 
   // Initialize form data when user changes
   useEffect(() => {
     if (user) {
+      // For existing users, try to find their current plan ID
+      let userPlanId = ''
+      if (user.subscription?.plan && subscriptionPlans.length > 0) {
+        const currentPlan = subscriptionPlans.find(plan => 
+          plan.name.toLowerCase() === user.subscription?.plan.toLowerCase() ||
+          plan._id === user.subscription?.plan
+        )
+        userPlanId = currentPlan?._id || (subscriptionPlans[0]?._id || '')
+      } else if (subscriptionPlans.length > 0) {
+        userPlanId = subscriptionPlans[0]._id
+      }
+
       setFormData({
         name: user.name || '',
         email: user.email || '',
-        role: user.role || 'basic',
+        role: userPlanId,
         isActive: user.isActive ?? true, // Use nullish coalescing to handle undefined
         subscription: user.subscription
       })
@@ -85,7 +156,7 @@ export default function UserModal({ user, isOpen, onClose, onSave }: UserModalPr
       setFormData({
         name: '',
         email: '',
-        role: 'basic',
+        role: subscriptionPlans.length > 0 ? subscriptionPlans[0]._id : '',
         isActive: true,
         password: '',
         confirmPassword: ''
@@ -93,7 +164,7 @@ export default function UserModal({ user, isOpen, onClose, onSave }: UserModalPr
       setShowPasswordFields(true)
     }
     setErrors({})
-  }, [user])
+  }, [user, subscriptionPlans])
 
   const handleInputChange = (field: keyof FormData, value: any) => {
     setFormData(prev => ({
@@ -283,20 +354,34 @@ export default function UserModal({ user, isOpen, onClose, onSave }: UserModalPr
                 </h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Role Field */}
+                  {/* Subscription Plan Field */}
                   <div>
                     <label className="block text-sm font-medium text-white mb-2">
-                      User Role
+                      Subscription Plan
                     </label>
-                    <select
-                      value={formData.role}
-                      onChange={(e) => handleInputChange('role', e.target.value as 'basic' | 'pro' | 'team')}
-                      className="w-full px-4 py-3 border border-accent-silver/20 rounded-lg bg-accent-silver/5 text-white focus:ring-2 focus:ring-accent-neon focus:border-accent-neon transition-all"
-                    >
-                      <option value="basic" className="bg-accent-obsidian text-white">Basic Plan (Free)</option>
-                      <option value="pro" className="bg-accent-obsidian text-white">Pro Plan ($15/month)</option>
-                      <option value="team" className="bg-accent-obsidian text-white">Team Plan ($49/month)</option>
-                    </select>
+                    {loadingPlans ? (
+                      <div className="w-full px-4 py-3 border border-accent-silver/20 rounded-lg bg-accent-silver/5 text-accent-silver/60 flex items-center">
+                        <div className="w-4 h-4 border-2 border-accent-silver/20 border-t-accent-neon rounded-full animate-spin mr-2"></div>
+                        Loading plans...
+                      </div>
+                    ) : (
+                      <select
+                        value={formData.role}
+                        onChange={(e) => handleInputChange('role', e.target.value)}
+                        className="w-full px-4 py-3 border border-accent-silver/20 rounded-lg bg-accent-silver/5 text-white focus:ring-2 focus:ring-accent-neon focus:border-accent-neon transition-all"
+                        disabled={subscriptionPlans.length === 0}
+                      >
+                        {subscriptionPlans.length === 0 ? (
+                          <option value="" className="bg-accent-obsidian text-white">No plans available</option>
+                        ) : (
+                          subscriptionPlans.map((plan) => (
+                            <option key={plan._id} value={plan._id} className="bg-accent-obsidian text-white">
+                              {plan.name} - ${plan.price.monthly}/month
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    )}
                   </div>
 
                   {/* Status Field */}

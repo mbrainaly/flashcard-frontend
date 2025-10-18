@@ -183,7 +183,7 @@ export default function BlogPostClient({ slug }: BlogPostClientProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="bg-white dark:bg-accent-obsidian rounded-xl shadow-sm border border-gray-200 dark:border-accent-silver/10 overflow-hidden"
+          className="bg-accent-obsidian rounded-xl shadow-sm border border-accent-silver/10 overflow-hidden"
         >
           {/* Featured Image */}
           <div className="relative h-64 md:h-96 overflow-hidden">

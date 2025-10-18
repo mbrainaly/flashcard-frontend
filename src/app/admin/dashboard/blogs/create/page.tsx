@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowLeftIcon,
@@ -11,11 +11,20 @@ import {
   FolderIcon,
   CalendarIcon,
   GlobeAltIcon,
-  XMarkIcon
+  XMarkIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminApi } from '@/hooks/useAdminApi'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { showToast } from '@/components/ui/Toast'
+
+interface Tag {
+  _id: string
+  name: string
+  slug: string
+}
 
 interface BlogFormData {
   title: string
@@ -24,7 +33,7 @@ interface BlogFormData {
   content: string
   featuredImage?: File
   categoryId: string
-  tags: string[]
+  tags: Tag[]
   status: 'draft' | 'published' | 'scheduled'
   publishedAt?: string
   scheduledAt?: string
@@ -36,6 +45,7 @@ interface BlogFormData {
 
 export default function CreateBlogPostPage() {
   const { hasPermission } = useAdminAuth()
+  const adminApi = useAdminApi()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'content' | 'seo' | 'settings'>('content')
@@ -52,16 +62,35 @@ export default function CreateBlogPostPage() {
     allowComments: true,
     featured: false
   })
-  const [newTag, setNewTag] = useState('')
+  const [availableTags, setAvailableTags] = useState<Tag[]>([])
+  const [selectedTagId, setSelectedTagId] = useState('')
   const [previewMode, setPreviewMode] = useState(false)
+  const [categories, setCategories] = useState<Array<{_id: string, name: string, slug: string}>>([])
+  const [uploadingImage, setUploadingImage] = useState(false)
 
-  // Mock categories
-  const categories = [
-    { _id: '1', name: 'Study Tips', slug: 'study-tips' },
-    { _id: '2', name: 'Learning Science', slug: 'learning-science' },
-    { _id: '3', name: 'Productivity', slug: 'productivity' },
-    { _id: '4', name: 'Technology', slug: 'technology' }
-  ]
+  // Fetch categories and tags from API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [categoriesResponse, tagsResponse] = await Promise.all([
+          adminApi.get('/api/admin/blogs/categories'),
+          adminApi.get('/api/admin/blogs/tags')
+        ])
+        
+        if (categoriesResponse.success) {
+          setCategories(categoriesResponse.data.filter((cat: any) => cat.isActive))
+        }
+        
+        if (tagsResponse.success) {
+          setAvailableTags(tagsResponse.data)
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error)
+      }
+    }
+
+    fetchData()
+  }, [adminApi])
 
   const generateSlug = (title: string) => {
     return title
@@ -82,47 +111,145 @@ export default function CreateBlogPostPage() {
   }
 
   const handleAddTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }))
-      setNewTag('')
-    }
-  }
-
-  const handleRemoveTag = (tagToRemove: string) => {
+    if (!selectedTagId) return
+    
+    // Find the selected tag from available tags
+    const selectedTag = availableTags.find(tag => tag._id === selectedTagId)
+    if (!selectedTag) return
+    
+    // Check if tag is already added
+    if (formData.tags.some(tag => tag._id === selectedTag._id)) return
+    
     setFormData(prev => ({
       ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
+      tags: [...prev.tags, selectedTag]
+    }))
+    setSelectedTagId('')
+  }
+
+  const handleRemoveTag = (tagToRemove: Tag) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags.filter(tag => tag._id !== tagToRemove._id)
     }))
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      setFormData(prev => ({ ...prev, featuredImage: file }))
+    if (!file) return
+
+    try {
+      setUploadingImage(true)
+      
+      // Create FormData for file upload
+      const uploadFormData = new FormData()
+      uploadFormData.append('image', file)
+
+      // Upload to S3 via admin API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/blogs/upload-image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: uploadFormData
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setFormData(prev => ({ ...prev, featuredImage: file }))
+          showToast({
+            type: 'success',
+            title: 'Success',
+            message: 'Image uploaded successfully'
+          })
+        } else {
+          throw new Error(data.message || 'Failed to upload image')
+        }
+      } else {
+        throw new Error('Failed to upload image')
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to upload image'
+      })
+    } finally {
+      setUploadingImage(false)
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, isDraft = false) => {
     e.preventDefault()
-    setLoading(true)
+    
+    if (!formData.title.trim()) {
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Title is required'
+      })
+      return
+    }
+
+    if (!formData.content.trim()) {
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Content is required'
+      })
+      return
+    }
 
     try {
-      // Here you would make the API call to create the blog post
-      console.log('Creating blog post:', formData)
+      setLoading(true)
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const blogData = {
+        title: formData.title,
+        slug: formData.slug,
+        content: formData.content,
+        excerpt: formData.excerpt,
+        status: isDraft ? 'draft' : formData.status,
+        categories: formData.categoryId ? [formData.categoryId] : [],
+        tags: formData.tags.map(tag => tag._id),
+        publishedAt: formData.publishedAt,
+        scheduledAt: formData.scheduledAt,
+        allowComments: formData.allowComments,
+        featured: formData.featured,
+        seo: {
+          title: formData.seoTitle,
+          description: formData.seoDescription,
+          keywords: []
+        }
+      }
+
+      const response = await adminApi.post('/api/admin/blogs', blogData)
       
-      // Redirect to blog management page
-      router.push('/admin/dashboard/blogs')
+      if (response.success) {
+        showToast({
+          type: 'success',
+          title: 'Success',
+          message: `Blog post ${isDraft ? 'saved as draft' : 'created'} successfully`
+        })
+        router.push('/admin/dashboard/blogs')
+      } else {
+        throw new Error(response.error || 'Failed to create blog post')
+      }
     } catch (error) {
       console.error('Error creating blog post:', error)
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to create blog post'
+      })
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSaveAsDraft = (e: React.FormEvent) => {
+    handleSubmit(e, true)
   }
 
   if (!hasPermission('blogs.write')) {
@@ -161,10 +288,17 @@ export default function CreateBlogPostPage() {
         <div className="mt-4 sm:mt-0 flex items-center space-x-4">
           <button
             onClick={() => setPreviewMode(!previewMode)}
-            className="inline-flex items-center px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-accent-silver/30 text-gray-700 dark:text-accent-silver/80 rounded-lg hover:bg-gray-50 dark:hover:bg-accent-silver/10 hover:text-gray-900 dark:hover:text-white transition-colors"
           >
             <EyeIcon className="w-4 h-4 mr-2" />
             {previewMode ? 'Edit' : 'Preview'}
+          </button>
+          <button
+            onClick={handleSaveAsDraft}
+            disabled={loading || !formData.title.trim()}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-accent-silver/30 text-gray-700 dark:text-accent-silver/80 rounded-lg hover:bg-gray-50 dark:hover:bg-accent-silver/10 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Saving...' : 'Save as Draft'}
           </button>
           <button
             onClick={handleSubmit}
@@ -266,23 +400,47 @@ export default function CreateBlogPostPage() {
                     </label>
                     <div className="border-2 border-dashed border-gray-300 dark:border-accent-silver/20 rounded-lg p-6">
                       <div className="text-center">
-                        <PhotoIcon className="mx-auto h-12 w-12 text-gray-400" />
-                        <div className="mt-4">
-                          <label className="cursor-pointer">
-                            <span className="mt-2 block text-sm font-medium text-gray-900 dark:text-white">
-                              Upload an image
-                            </span>
-                            <input
-                              type="file"
-                              className="sr-only"
-                              accept="image/*"
-                              onChange={handleImageUpload}
-                            />
-                          </label>
-                        </div>
-                        <p className="mt-2 text-xs text-gray-500 dark:text-accent-silver">
-                          PNG, JPG, GIF up to 10MB
-                        </p>
+                        {uploadingImage ? (
+                          <div className="flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-neon"></div>
+                            <p className="mt-2 text-sm text-gray-600 dark:text-accent-silver">Uploading...</p>
+                          </div>
+                        ) : formData.featuredImage ? (
+                          <div className="flex flex-col items-center">
+                            <CheckCircleIcon className="mx-auto h-12 w-12 text-green-500" />
+                            <p className="mt-2 text-sm text-gray-900 dark:text-white">
+                              {formData.featuredImage.name}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setFormData(prev => ({ ...prev, featuredImage: undefined }))}
+                              className="mt-2 text-xs text-red-600 hover:text-red-800"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <PhotoIcon className="mx-auto h-12 w-12 text-gray-400" />
+                            <div className="mt-4">
+                              <label className="cursor-pointer">
+                                <span className="mt-2 block text-sm font-medium text-gray-900 dark:text-white">
+                                  Upload an image
+                                </span>
+                                <input
+                                  type="file"
+                                  className="sr-only"
+                                  accept="image/*"
+                                  onChange={handleImageUpload}
+                                  disabled={uploadingImage}
+                                />
+                              </label>
+                            </div>
+                            <p className="mt-2 text-xs text-gray-500 dark:text-accent-silver">
+                              PNG, JPG, GIF up to 10MB
+                            </p>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -394,29 +552,52 @@ export default function CreateBlogPostPage() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Tags
                     </label>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <input
-                        type="text"
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
-                        placeholder="Add a tag..."
-                      />
-                      <button
-                        onClick={handleAddTag}
-                        className="px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors"
-                      >
-                        Add
-                      </button>
-                    </div>
+                    {availableTags.length > 0 ? (
+                      <div className="flex items-center space-x-2 mb-2">
+                        <select
+                          value={selectedTagId}
+                          onChange={(e) => setSelectedTagId(e.target.value)}
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                        >
+                          <option value="">Select a tag...</option>
+                          {availableTags
+                            .filter(tag => !formData.tags.some(existingTag => existingTag._id === tag._id))
+                            .map((tag) => (
+                              <option key={tag._id} value={tag._id} className="bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white">
+                                {tag.name}
+                              </option>
+                            ))
+                          }
+                        </select>
+                        <button
+                          onClick={handleAddTag}
+                          disabled={!selectedTagId}
+                          className="px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mb-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                          No tags available. 
+                          <Link 
+                            href="/admin/dashboard/blogs/tags" 
+                            className="ml-1 font-medium underline hover:no-underline"
+                            target="_blank"
+                          >
+                            Create tags first
+                          </Link>
+                        </p>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       {formData.tags.map((tag) => (
                         <span
-                          key={tag}
+                          key={tag._id}
                           className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300"
                         >
-                          {tag}
+                          {tag.name}
                           <button
                             onClick={() => handleRemoveTag(tag)}
                             className="ml-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
@@ -467,17 +648,11 @@ export default function CreateBlogPostPage() {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
               <div className="space-y-3">
                 <button
-                  onClick={handleSubmit}
-                  disabled={loading || !formData.title.trim()}
-                  className="w-full px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => setPreviewMode(!previewMode)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-accent-silver/30 text-gray-700 dark:text-accent-silver/80 rounded-lg hover:bg-gray-50 dark:hover:bg-accent-silver/10 hover:text-gray-900 dark:hover:text-white transition-colors"
                 >
-                  {loading ? 'Creating...' : 'Create Post'}
-                </button>
-                <button
-                  onClick={() => setFormData(prev => ({ ...prev, status: 'draft' }))}
-                  className="w-full px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors"
-                >
-                  Save as Draft
+                  <EyeIcon className="w-4 h-4 mr-2 inline" />
+                  {previewMode ? 'Edit Mode' : 'Preview'}
                 </button>
               </div>
             </div>

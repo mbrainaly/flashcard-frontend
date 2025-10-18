@@ -48,8 +48,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} bg-accent-obsidian min-h-screen`}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.className} bg-white dark:bg-accent-obsidian min-h-screen transition-colors`} suppressHydrationWarning>
         <Providers>
           <MainLayout>{children}</MainLayout>
         </Providers>

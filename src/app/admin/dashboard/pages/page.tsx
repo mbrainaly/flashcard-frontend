@@ -11,7 +11,6 @@ import {
   InformationCircleIcon,
   PhoneIcon,
   SparklesIcon,
-  Cog6ToothIcon,
   CheckCircleIcon,
   ClockIcon,
   ExclamationTriangleIcon
@@ -102,8 +101,7 @@ export default function PagesOverviewPage() {
       'terms': DocumentTextIcon,
       'about': InformationCircleIcon,
       'contact': PhoneIcon,
-      'features': SparklesIcon,
-      'seo': Cog6ToothIcon
+      'features': SparklesIcon
     }
     return iconMap[slug] || DocumentTextIcon
   }
@@ -191,14 +189,10 @@ export default function PagesOverviewPage() {
         </div>
         
         <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-          <Link
-            href="/admin/dashboard/pages/seo"
-            className="inline-flex items-center px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors"
+          <button
+            onClick={() => window.open('/', '_blank')}
+            className="inline-flex items-center px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors"
           >
-            <Cog6ToothIcon className="w-4 h-4 mr-2" />
-            SEO Settings
-          </Link>
-          <button className="inline-flex items-center px-4 py-2 bg-accent-neon hover:bg-accent-neon/90 text-black font-medium rounded-lg transition-colors">
             <GlobeAltIcon className="w-4 h-4 mr-2" />
             Preview Site
           </button>
@@ -210,7 +204,7 @@ export default function PagesOverviewPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
           <StatsCard
             title="Total Pages"
@@ -227,22 +221,6 @@ export default function PagesOverviewPage() {
             trend="up"
             icon={<CheckCircleIcon className="w-6 h-6" />}
             color="green"
-          />
-          <StatsCard
-            title="Draft Pages"
-            value={overview.draftPages.toString()}
-            change="0"
-            trend="neutral"
-            icon={<PencilIcon className="w-6 h-6" />}
-            color="orange"
-          />
-          <StatsCard
-            title="Review Pages"
-            value={overview.reviewPages.toString()}
-            change="0"
-            trend="neutral"
-            icon={<ClockIcon className="w-6 h-6" />}
-            color="yellow"
           />
           <StatsCard
             title="Total Views"
@@ -349,40 +327,6 @@ export default function PagesOverviewPage() {
         })}
       </motion.div>
 
-      {/* Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="bg-white dark:bg-accent-obsidian rounded-xl shadow-sm border border-gray-200 dark:border-accent-silver/10 p-6"
-      >
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <button className="flex items-center p-4 border border-gray-200 dark:border-accent-silver/20 rounded-lg hover:bg-gray-50 dark:hover:bg-accent-silver/5 transition-colors">
-            <DocumentTextIcon className="w-5 h-5 text-gray-400 mr-3" />
-            <div className="text-left">
-              <div className="text-sm font-medium text-gray-900 dark:text-white">Bulk Update</div>
-              <div className="text-xs text-gray-500 dark:text-accent-silver">Update multiple pages</div>
-            </div>
-          </button>
-          
-          <button className="flex items-center p-4 border border-gray-200 dark:border-accent-silver/20 rounded-lg hover:bg-gray-50 dark:hover:bg-accent-silver/5 transition-colors">
-            <GlobeAltIcon className="w-5 h-5 text-gray-400 mr-3" />
-            <div className="text-left">
-              <div className="text-sm font-medium text-gray-900 dark:text-white">SEO Audit</div>
-              <div className="text-xs text-gray-500 dark:text-accent-silver">Check SEO health</div>
-            </div>
-          </button>
-          
-          <button className="flex items-center p-4 border border-gray-200 dark:border-accent-silver/20 rounded-lg hover:bg-gray-50 dark:hover:bg-accent-silver/5 transition-colors">
-            <EyeIcon className="w-5 h-5 text-gray-400 mr-3" />
-            <div className="text-left">
-              <div className="text-sm font-medium text-gray-900 dark:text-white">Analytics</div>
-              <div className="text-xs text-gray-500 dark:text-accent-silver">View page analytics</div>
-            </div>
-          </button>
-        </div>
-      </motion.div>
     </div>
   )
 }

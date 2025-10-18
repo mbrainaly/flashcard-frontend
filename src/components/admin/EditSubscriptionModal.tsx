@@ -124,12 +124,12 @@ export default function EditSubscriptionModal({ subscription, onClose, onUpdate 
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
-                className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
+                className="w-full px-3 py-2 bg-white dark:bg-accent-silver/5 border border-gray-300 dark:border-accent-silver/20 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
               >
-                <option value="active">Active</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="past_due">Past Due</option>
-                <option value="trialing">Trialing</option>
+                <option value="active" className="bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white">Active</option>
+                <option value="cancelled" className="bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white">Cancelled</option>
+                <option value="past_due" className="bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white">Past Due</option>
+                <option value="trialing" className="bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white">Trialing</option>
               </select>
             </div>
 
@@ -143,7 +143,7 @@ export default function EditSubscriptionModal({ subscription, onClose, onUpdate 
                 name="currentPeriodEnd"
                 value={formData.currentPeriodEnd}
                 onChange={handleChange}
-                className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
+                className="w-full px-3 py-2 bg-white dark:bg-accent-silver/5 border border-gray-300 dark:border-accent-silver/20 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
               />
             </div>
           </div>
@@ -173,7 +173,7 @@ export default function EditSubscriptionModal({ subscription, onClose, onUpdate 
               value={formData.notes}
               onChange={handleChange}
               placeholder="Add any notes about this subscription change..."
-              className="w-full px-3 py-2 bg-accent-silver/5 border border-accent-silver/20 rounded-lg text-white placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
+              className="w-full px-3 py-2 bg-white dark:bg-accent-silver/5 border border-gray-300 dark:border-accent-silver/20 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-accent-silver/50 focus:ring-2 focus:ring-accent-neon focus:border-accent-neon"
             />
           </div>
 

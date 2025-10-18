@@ -7,7 +7,6 @@ import {
   InformationCircleIcon,
   EyeIcon,
   DocumentTextIcon,
-  GlobeAltIcon,
   ClockIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -117,7 +116,6 @@ export default function AboutPage() {
       throw error
     }
   }
-  const [previewMode, setPreviewMode] = useState(false)
 
   useEffect(() => {
     const fetchPageData = async () => {
@@ -228,6 +226,57 @@ export default function AboutPage() {
     }) : null)
   }
 
+  const updateTeamMemberSocialLink = (id: string, platform: string, value: string) => {
+    if (!pageData) return
+    setPageData(prev => prev ? ({
+      ...prev,
+      teamMembers: prev.teamMembers.map(member => 
+        member.id === id ? { 
+          ...member, 
+          socialLinks: { ...member.socialLinks, [platform]: value }
+        } : member
+      )
+    }) : null)
+  }
+
+  const uploadTeamMemberImage = async (file: File, memberId: string) => {
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/pages/upload-image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: formData
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to upload image')
+      }
+      
+      const result = await response.json()
+      const imageUrl = result.data.url
+      
+      console.log(`Uploaded team member ${memberId} image:`, imageUrl)
+      
+      // Update team member with S3 URL
+      setPageData(prev => prev ? ({
+        ...prev,
+        teamMembers: prev.teamMembers.map(member => 
+          member.id === memberId ? { ...member, image: imageUrl } : member
+        )
+      }) : null)
+      
+      return imageUrl
+    } catch (error) {
+      console.error(`Error uploading team member ${memberId} image:`, error)
+      alert('Failed to upload image. Please try again.')
+      throw error
+    }
+  }
+
   if (!hasPermission('pages.write')) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -296,15 +345,11 @@ export default function AboutPage() {
         
         <div className="mt-4 sm:mt-0 flex items-center space-x-4">
           <button
-            onClick={() => setPreviewMode(!previewMode)}
+            onClick={() => window.open('/about', '_blank')}
             className="inline-flex items-center px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors"
           >
             <EyeIcon className="w-4 h-4 mr-2" />
-            {previewMode ? 'Edit' : 'Preview'}
-          </button>
-          <button className="inline-flex items-center px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors">
-            <GlobeAltIcon className="w-4 h-4 mr-2" />
-            View Live
+            Preview
           </button>
           <button
             onClick={handleSave}
@@ -349,7 +394,7 @@ export default function AboutPage() {
                 {[
                   { id: 'content', name: 'Content', icon: DocumentTextIcon },
                   { id: 'team', name: 'Team', icon: UserGroupIcon },
-                  { id: 'seo', name: 'SEO', icon: GlobeAltIcon },
+                  { id: 'seo', name: 'SEO', icon: DocumentTextIcon },
                   { id: 'settings', name: 'Settings', icon: InformationCircleIcon }
                 ].map((tab) => {
                   const Icon = tab.icon
@@ -866,6 +911,7 @@ export default function AboutPage() {
                               value={member.name}
                               onChange={(e) => updateTeamMember(member.id, 'name', e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                              placeholder="John Doe"
                             />
                           </div>
                           
@@ -878,6 +924,7 @@ export default function AboutPage() {
                               value={member.role}
                               onChange={(e) => updateTeamMember(member.id, 'role', e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                              placeholder="CEO & Founder"
                             />
                           </div>
                         </div>
@@ -891,7 +938,91 @@ export default function AboutPage() {
                             onChange={(e) => updateTeamMember(member.id, 'bio', e.target.value)}
                             rows={3}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent"
+                            placeholder="Brief bio about the team member..."
                           />
+                        </div>
+
+                        {/* Profile Image Upload */}
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Profile Image
+                          </label>
+                          <div className="flex items-center space-x-4">
+                            <div className="flex-shrink-0">
+                              {member.image ? (
+                                <img
+                                  src={member.image}
+                                  alt={member.name}
+                                  className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-accent-silver/20"
+                                />
+                              ) : (
+                                <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-accent-silver/10 border-2 border-gray-200 dark:border-accent-silver/20 flex items-center justify-center">
+                                  <PhotoIcon className="w-6 h-6 text-gray-400 dark:text-accent-silver/60" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0]
+                                  if (file) {
+                                    await uploadTeamMemberImage(file, member.id)
+                                  }
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent text-sm"
+                              />
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Upload a profile photo (recommended: 400x400px)
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Social Links */}
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Social Links
+                          </label>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                LinkedIn URL
+                              </label>
+                              <input
+                                type="url"
+                                value={member.socialLinks?.linkedin || ''}
+                                onChange={(e) => updateTeamMemberSocialLink(member.id, 'linkedin', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent text-sm"
+                                placeholder="https://linkedin.com/in/username"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                Twitter URL
+                              </label>
+                              <input
+                                type="url"
+                                value={member.socialLinks?.twitter || ''}
+                                onChange={(e) => updateTeamMemberSocialLink(member.id, 'twitter', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent text-sm"
+                                placeholder="https://twitter.com/username"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                GitHub URL
+                              </label>
+                              <input
+                                type="url"
+                                value={member.socialLinks?.github || ''}
+                                onChange={(e) => updateTeamMemberSocialLink(member.id, 'github', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-accent-silver/20 rounded-lg bg-white dark:bg-accent-obsidian text-gray-900 dark:text-white focus:ring-2 focus:ring-accent-neon focus:border-transparent text-sm"
+                                placeholder="https://github.com/username"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}

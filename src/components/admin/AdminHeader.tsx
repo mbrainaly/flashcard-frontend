@@ -7,9 +7,12 @@ import {
   UserCircleIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  SunIcon,
+  MoonIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useTheme } from '@/components/providers/ThemeProvider'
 
 interface AdminHeaderProps {
   title?: string
@@ -19,6 +22,7 @@ interface AdminHeaderProps {
 export default function AdminHeader({ title = 'Dashboard', subtitle }: AdminHeaderProps) {
   const router = useRouter()
   const { admin, logout } = useAdminAuth()
+  const { theme, toggleTheme, mounted } = useTheme()
   const [showProfileMenu, setShowProfileMenu] = useState(false)
 
   const handleLogout = async () => {
@@ -47,6 +51,33 @@ export default function AdminHeader({ title = 'Dashboard', subtitle }: AdminHead
 
         {/* Right side controls */}
         <div className="flex items-center space-x-4">
+          {/* Theme Toggle */}
+          {mounted && (
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-gray-500 dark:text-accent-silver/60 font-mono">
+                {theme}
+              </span>
+              <button
+                onClick={() => {
+                  console.log('Theme toggle clicked, current theme:', theme)
+                  console.log('Document classes before:', document.documentElement.className)
+                  toggleTheme()
+                  setTimeout(() => {
+                    console.log('Document classes after:', document.documentElement.className)
+                  }, 100)
+                }}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-accent-silver/10 transition-colors border border-gray-200 dark:border-accent-silver/20"
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {theme === 'dark' ? (
+                  <SunIcon className="w-5 h-5 text-yellow-500 dark:text-accent-neon" />
+                ) : (
+                  <MoonIcon className="w-5 h-5 text-gray-700 dark:text-accent-silver" />
+                )}
+              </button>
+            </div>
+          )}
+          
           {/* Profile Menu */}
           <div className="relative">
             <button

@@ -363,11 +363,15 @@ export default function EditBlogPostPage() {
         
         <div className="mt-4 sm:mt-0 flex items-center space-x-4">
           <button
-            onClick={() => setPreviewMode(!previewMode)}
-            className="inline-flex items-center px-4 py-2 border border-accent-silver/30 text-accent-silver/80 rounded-lg hover:bg-accent-silver/10 hover:text-white transition-colors"
+            onClick={() => {
+              if (post?.slug) {
+                window.open(`/blog/${post.slug}`, '_blank')
+              }
+            }}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-accent-silver/30 text-gray-700 dark:text-accent-silver/80 rounded-lg hover:bg-gray-50 dark:hover:bg-accent-silver/10 hover:text-gray-900 dark:hover:text-white transition-colors"
           >
             <EyeIcon className="w-4 h-4 mr-2" />
-            {previewMode ? 'Edit' : 'Preview'}
+            Preview
           </button>
           <button
             onClick={handleDelete}
