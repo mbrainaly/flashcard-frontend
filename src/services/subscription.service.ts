@@ -26,7 +26,7 @@ export interface CheckoutSession {
 export interface Plan {
   id: string;
   name: string;
-  price: number;
+  price: number | { monthly: number; yearly: number };
   monthlyCredits: number;
   allowDocuments: boolean;
   allowYoutubeAnalyze: boolean;

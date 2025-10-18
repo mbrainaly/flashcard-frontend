@@ -23,6 +23,7 @@ interface BillingPlan {
   name: string
   price: string
   monthlyPrice: number
+  yearlyPrice?: number
   description: string
   features: string[]
   isPopular?: boolean
@@ -44,6 +45,8 @@ function BillingContent() {
   const [userCredits, setUserCredits] = useState<UserCredits | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [isFetching, setIsFetching] = useState(false) // Prevent duplicate calls
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annually'>('monthly')
+  const [hasYearlyPlans, setHasYearlyPlans] = useState(false)
 
   // Log session data for debugging
   useEffect(() => {
@@ -63,18 +66,34 @@ function BillingContent() {
   const planId = searchParams.get('plan')
 
   // Build plans from backend
-  const plans: BillingPlan[] = (dbPlans || []).map((p) => ({
-    id: p.id,
-    name: p.name === 'Basic' ? 'Free' : p.name,
-    price: `$${p.price}`,
-    monthlyPrice: p.price,
-    description: p.name === 'Basic' ? 'Everything you need to try AIFlash for free.' : p.name === 'Pro' ? 'Advanced tools for serious learners.' : 'Best for organizations that need scale.',
-    isPopular: p.id === 'pro',
-    featured: p.id === 'pro',
-    isCurrent: subscription?.plan === p.id,
-    isSelected: planId === p.id,
-    features: p.features,
-  }))
+  const plans: BillingPlan[] = (dbPlans || [])
+    .map((p) => {
+      const monthlyPrice = typeof p.price === 'object' ? p.price.monthly : p.price
+      const yearlyPrice = typeof p.price === 'object' && p.price.yearly ? p.price.yearly : 0
+      const displayPrice = billingInterval === 'monthly' ? monthlyPrice : yearlyPrice
+      
+      return {
+        id: p.id,
+        name: p.name === 'Basic' ? 'Free' : p.name,
+        price: `$${displayPrice}`,
+        monthlyPrice: monthlyPrice,
+        yearlyPrice: yearlyPrice,
+        description: p.name === 'Basic' ? 'Everything you need to try AIFlash for free.' : p.name === 'Pro' ? 'Advanced tools for serious learners.' : 'Best for organizations that need scale.',
+        isPopular: p.id === 'pro',
+        featured: p.id === 'pro',
+        isCurrent: subscription?.plan === p.id,
+        isSelected: planId === p.id,
+        features: p.features,
+      }
+    })
+    .filter((plan) => {
+      // If yearly is selected, only show plans that have yearly pricing
+      if (billingInterval === 'annually') {
+        return plan.yearlyPrice > 0
+      }
+      // For monthly, show all plans
+      return true
+    })
 
   // Helper function to get plan name from plan ID
   const getPlanName = (planId: string): string => {
@@ -279,6 +298,10 @@ function BillingContent() {
       try {
         const p = await getPlans()
         setDbPlans(p)
+        
+        // Check if any plan has yearly pricing
+        const hasYearly = p.some(plan => typeof plan.price === 'object' && plan.price.yearly !== undefined && plan.price.yearly > 0)
+        setHasYearlyPlans(hasYearly)
       } catch (e) {
         console.error('Failed to load plans', e)
       }
@@ -663,6 +686,37 @@ function BillingContent() {
           </button>
         </div>
 
+        {/* Billing Interval Toggle */}
+        {activeTab === 'plans' && hasYearlyPlans && (
+          <div className="flex justify-center mb-8">
+            <div className="relative flex bg-accent-silver/10 p-1 rounded-full">
+              <button
+                onClick={() => setBillingInterval('monthly')}
+                className={`relative px-6 py-2 text-sm font-medium rounded-full transition-all ${
+                  billingInterval === 'monthly'
+                    ? 'bg-accent-neon text-black'
+                    : 'text-accent-silver hover:text-white'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingInterval('annually')}
+                className={`relative px-6 py-2 text-sm font-medium rounded-full transition-all ${
+                  billingInterval === 'annually'
+                    ? 'bg-accent-neon text-black'
+                    : 'text-accent-silver hover:text-white'
+                }`}
+              >
+                Annually
+                <span className="ml-2 text-xs bg-accent-gold/20 text-accent-gold px-2 py-0.5 rounded-full">
+                  Save up to 20%
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'plans' ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -701,7 +755,9 @@ function BillingContent() {
                 <p className="mt-4 text-sm leading-6 text-accent-silver">{plan.description}</p>
                 <p className="mt-6 flex items-baseline gap-x-1">
                   <span className="text-4xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-accent-gold to-accent-neon">{plan.price}</span>
-                  <span className="text-sm font-semibold leading-6 text-accent-silver">/month</span>
+                  <span className="text-sm font-semibold leading-6 text-accent-silver">
+                    /{billingInterval === 'monthly' ? 'month' : 'year'}
+                  </span>
                 </p>
                 <button
                   onClick={() => handleUpgrade(plan.id)}

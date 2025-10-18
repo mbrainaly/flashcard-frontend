@@ -23,6 +23,8 @@ export default function PricingPage() {
   const [isClient, setIsClient] = useState(false)
   const [tiers, setTiers] = useState<PricingTier[]>([])
   const [loading, setLoading] = useState(true)
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annually'>('monthly')
+  const [hasYearlyPlans, setHasYearlyPlans] = useState(false)
 
   useEffect(() => {
     setIsClient(true)
@@ -36,19 +38,28 @@ export default function PricingPage() {
         const plans = await getPublicPlans()
         
         // Transform database plans to pricing tier format
-        const transformedTiers: PricingTier[] = plans.map((plan: Plan) => ({
-          name: plan.name === 'Basic' ? 'Free' : plan.name,
-          id: `tier-${plan.id}`,
-          planId: plan.id,
-          href: '/auth/register',
-          price: { 
-            monthly: `$${plan.price}`, 
-            annually: `$${plan.price * 12}` 
-          },
-          description: getDescriptionForPlan(plan.name),
-          features: plan.features,
-          featured: plan.isPopular || false // Use database isPopular field
-        }))
+        const transformedTiers: PricingTier[] = plans.map((plan: Plan) => {
+          const monthlyPrice = typeof plan.price === 'object' ? plan.price.monthly : plan.price
+          const yearlyPrice = typeof plan.price === 'object' && plan.price.yearly ? plan.price.yearly : 0
+          
+          return {
+            name: plan.name === 'Basic' ? 'Free' : plan.name,
+            id: `tier-${plan.id}`,
+            planId: plan.id,
+            href: '/auth/register',
+            price: { 
+              monthly: `$${monthlyPrice}`, 
+              annually: `$${yearlyPrice}` 
+            },
+            description: getDescriptionForPlan(plan.name),
+            features: plan.features,
+            featured: plan.isPopular || false // Use database isPopular field
+          }
+        })
+        
+        // Check if any plan has yearly pricing
+        const hasYearly = plans.some(plan => typeof plan.price === 'object' && plan.price.yearly !== undefined && plan.price.yearly > 0)
+        setHasYearlyPlans(hasYearly)
         
         setTiers(transformedTiers)
       } catch (error) {
@@ -111,6 +122,38 @@ export default function PricingPage() {
           Choose a plan that best fits your needs. All plans include our core features with varying levels of
           functionality and support.
         </p>
+        
+        {/* Billing Interval Toggle */}
+        {hasYearlyPlans && (
+          <div className="mt-10 flex justify-center">
+            <div className="relative flex bg-accent-silver/10 p-1 rounded-full">
+              <button
+                onClick={() => setBillingInterval('monthly')}
+                className={`relative px-6 py-2 text-sm font-medium rounded-full transition-all ${
+                  billingInterval === 'monthly'
+                    ? 'bg-accent-neon text-black'
+                    : 'text-accent-silver hover:text-white'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingInterval('annually')}
+                className={`relative px-6 py-2 text-sm font-medium rounded-full transition-all ${
+                  billingInterval === 'annually'
+                    ? 'bg-accent-neon text-black'
+                    : 'text-accent-silver hover:text-white'
+                }`}
+              >
+                Annually
+                <span className="ml-2 text-xs bg-accent-gold/20 text-accent-gold px-2 py-0.5 rounded-full">
+                  Save up to 20%
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
+        
         <div className="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-y-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3 lg:gap-x-8 xl:gap-x-12">
           {loading ? (
             // Loading skeleton
@@ -137,8 +180,18 @@ export default function PricingPage() {
               <p className="text-accent-silver/70 text-sm mt-2">Please check back later or contact support.</p>
             </div>
           ) : (
-            // Render actual tiers
-            tiers.map((tier) => (
+            // Render actual tiers - filter based on billing interval
+            tiers
+              .filter((tier) => {
+                // If yearly is selected, only show plans that have yearly pricing
+                if (billingInterval === 'annually') {
+                  const yearlyPrice = parseInt(tier.price.annually.replace('$', ''))
+                  return yearlyPrice > 0
+                }
+                // For monthly, show all plans
+                return true
+              })
+              .map((tier) => (
             <div
               key={tier.id}
               className={classNames(
@@ -156,8 +209,12 @@ export default function PricingPage() {
               </div>
               <p className="mt-4 text-sm leading-6 text-accent-silver">{tier.description}</p>
               <p className="mt-6 flex items-baseline gap-x-1">
-                <span className="text-4xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-accent-gold to-accent-neon">{tier.price.monthly}</span>
-                <span className="text-sm font-semibold leading-6 text-accent-silver">/month</span>
+                <span className="text-4xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-accent-gold to-accent-neon">
+                  {billingInterval === 'monthly' ? tier.price.monthly : tier.price.annually}
+                </span>
+                <span className="text-sm font-semibold leading-6 text-accent-silver">
+                  /{billingInterval === 'monthly' ? 'month' : 'year'}
+                </span>
               </p>
               <button
                 onClick={() => handleUpgradeClick(tier)}
