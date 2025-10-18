@@ -228,9 +228,9 @@ export default function ProfilePage() {
         try {
           const subscriptionData = await getSubscription()
           setSubscription({
-            id: subscriptionData.plan,
-            name: subscriptionData.plan.charAt(0).toUpperCase() + subscriptionData.plan.slice(1),
-            price: subscriptionData.plan === 'basic' ? '$0' : subscriptionData.plan === 'pro' ? '$15' : '$49',
+            id: subscriptionData.planDetails?.id || subscriptionData.plan,
+            name: subscriptionData.planDetails?.name || subscriptionData.plan.charAt(0).toUpperCase() + subscriptionData.plan.slice(1),
+            price: subscriptionData.planDetails?.price ? `$${subscriptionData.planDetails.price}` : (subscriptionData.plan === 'basic' ? '$0' : subscriptionData.plan === 'pro' ? '$15' : '$49'),
             credits: subscriptionData.credits,
             nextRenewal: subscriptionData.currentPeriodEnd ? new Date(subscriptionData.currentPeriodEnd).toLocaleDateString() : undefined
           })
@@ -267,9 +267,9 @@ export default function ProfilePage() {
         const data = await getSubscription()
         if (mounted) {
           setSubscription({
-            id: data.plan,
-            name: data.plan.charAt(0).toUpperCase() + data.plan.slice(1),
-            price: data.plan === 'basic' ? '$0' : data.plan === 'pro' ? '$15' : '$49',
+            id: data.planDetails?.id || data.plan,
+            name: data.planDetails?.name || data.plan.charAt(0).toUpperCase() + data.plan.slice(1),
+            price: data.planDetails?.price ? `$${data.planDetails.price}` : (data.plan === 'basic' ? '$0' : data.plan === 'pro' ? '$15' : '$49'),
             credits: data.credits,
             nextRenewal: data.currentPeriodEnd ? new Date(data.currentPeriodEnd).toLocaleDateString() : undefined
           })
