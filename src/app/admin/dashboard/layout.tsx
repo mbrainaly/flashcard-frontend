@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { AdminAuthProvider, useAdminAuth } from '@/contexts/AdminAuthContext'
-import { ThemeProvider } from '@/components/providers/ThemeProvider'
+import { AdminThemeProvider } from '@/components/providers/AdminThemeProvider'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import AdminHeader from '@/components/admin/AdminHeader'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -109,10 +109,10 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
-    <ThemeProvider>
+    <AdminThemeProvider>
       <AdminAuthProvider>
         <AdminLayoutContent>{children}</AdminLayoutContent>
       </AdminAuthProvider>
-    </ThemeProvider>
+    </AdminThemeProvider>
   )
 }

@@ -12,7 +12,7 @@ import {
   MoonIcon
 } from '@heroicons/react/24/outline'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
-import { useTheme } from '@/components/providers/ThemeProvider'
+import { useAdminTheme } from '@/components/providers/AdminThemeProvider'
 
 interface AdminHeaderProps {
   title?: string
@@ -22,7 +22,7 @@ interface AdminHeaderProps {
 export default function AdminHeader({ title = 'Dashboard', subtitle }: AdminHeaderProps) {
   const router = useRouter()
   const { admin, logout } = useAdminAuth()
-  const { theme, toggleTheme, mounted } = useTheme()
+  const { theme, toggleTheme, mounted } = useAdminTheme()
   const [showProfileMenu, setShowProfileMenu] = useState(false)
 
   const handleLogout = async () => {
