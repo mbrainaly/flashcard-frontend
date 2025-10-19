@@ -180,10 +180,10 @@ export default function QuizPage() {
           <div className="bg-glass backdrop-blur-sm rounded-xl p-8">
             <div className="text-center mb-8">
               <div className="text-4xl font-bold text-white mb-2">
-                {quizResults.score} / {quizResults.totalQuestions}
+                {quizResults.detailedAnswers?.filter(a => a.isCorrect).length || 0} / {quizResults.totalQuestions}
               </div>
               <div className="text-accent-silver">
-                {Math.round((quizResults.score / quizResults.totalQuestions) * 100)}% Correct
+                {Math.round(quizResults.score)}% Correct
               </div>
             </div>
 
