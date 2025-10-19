@@ -41,13 +41,29 @@ export const fetchWithAuth = async (endpoint: string, options: RequestInit = {})
     headers['Authorization'] = `Bearer ${session.user.accessToken}`;
   }
 
-  const response = await fetch(`${baseUrl}${normalizedEndpoint}`, {
-    ...options,
-    headers,
-    credentials: 'include'
-  });
+  // Set timeout based on endpoint - longer for AI operations
+  const isLongRunningOperation = 
+    endpoint.includes('/api/notes/generate') || 
+    endpoint.includes('/api/ai/') || 
+    endpoint.includes('/api/quizzes/generate');
+  
+  const timeoutMs = isLongRunningOperation ? 600000 : 120000; // 10 minutes for AI ops, 2 minutes for others
+  
+  // Create AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
+  try {
+    const response = await fetch(`${baseUrl}${normalizedEndpoint}`, {
+      ...options,
+      headers,
+      credentials: 'include',
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
     const status = response.status;
     const errorData = await response.json().catch(() => ({} as any));
     const message = errorData.message || `Request failed (${status})`;
@@ -91,7 +107,14 @@ export const fetchWithAuth = async (endpoint: string, options: RequestInit = {})
     }
 
     throw new Error(message);
-  }
+    }
 
-  return response;
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout - the operation is taking longer than expected. Please try again.');
+    }
+    throw error;
+  }
 }; 

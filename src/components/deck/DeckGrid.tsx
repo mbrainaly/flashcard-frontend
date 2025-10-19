@@ -46,20 +46,12 @@ export default function DeckGrid({ decks, onCreateDeck }: DeckGridProps) {
               </p>
             </div>
 
-            {/* Stats */}
-            <div className="mt-6 grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p className="text-lg font-semibold text-accent-neon">{deck.studyProgress.mastered}</p>
-                <p className="text-xs text-accent-silver">Mastered</p>
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-accent-gold">{deck.studyProgress.learning}</p>
-                <p className="text-xs text-accent-silver">Learning</p>
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-white">{deck.studyProgress.new}</p>
-                <p className="text-xs text-accent-silver">New</p>
-              </div>
+            {/* Card Count */}
+            <div className="mt-6 text-center">
+              <p className="text-2xl font-semibold text-accent-neon">{deck.totalCards || 0}</p>
+              <p className="text-sm text-accent-silver">
+                {deck.totalCards === 1 ? 'Card' : 'Cards'}
+              </p>
             </div>
 
             {/* Last studied */}

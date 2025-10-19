@@ -53,12 +53,27 @@ export default function QuizReviewForm({
   }
 
   // Handle adding a new question
-  const handleAddQuestion = () => {
+  const handleAddQuestion = (type: 'multiple-choice' | 'true-false' | 'short-answer' = 'multiple-choice') => {
+    let options: string[]
+    let correctOptionIndex = 0
+
+    switch (type) {
+      case 'short-answer':
+        options = [''] // Only one option for the correct answer
+        break
+      case 'true-false':
+        options = ['True', 'False']
+        break
+      default: // multiple-choice
+        options = ['', '', '', '']
+        break
+    }
+
     const newQuestion: IQuizQuestion = {
       question: '',
-      options: ['', '', '', ''],
-      correctOptionIndex: 0,
-      type: 'multiple-choice',
+      options,
+      correctOptionIndex,
+      type,
       difficulty: 'intermediate',
     }
     setQuestions([...questions, newQuestion])
@@ -151,43 +166,97 @@ export default function QuizReviewForm({
                               className="w-full bg-white/5 rounded-lg px-4 py-2 text-white"
                               placeholder="Enter question"
                             />
-                            <div className="space-y-2">
-                              {question.options.map((option, optionIndex) => (
-                                <div key={optionIndex} className="flex items-center gap-2">
-                                  <input
-                                    type="radio"
-                                    checked={question.correctOptionIndex === optionIndex}
-                                    onChange={() => handleQuestionEdit(index, { correctOptionIndex: optionIndex })}
-                                    className="text-accent-neon"
-                                    aria-label={`Set as correct answer for option ${optionIndex + 1}`}
-                                  />
-                                  <input
-                                    type="text"
-                                    value={option}
-                                    onChange={(e) => {
-                                      const newOptions = [...question.options]
-                                      newOptions[optionIndex] = e.target.value
-                                      handleQuestionEdit(index, { options: newOptions })
-                                    }}
-                                    className="flex-1 bg-white/5 rounded-lg px-4 py-2 text-white"
-                                    placeholder={`Option ${optionIndex + 1}`}
-                                    aria-label={`Option ${optionIndex + 1}`}
-                                  />
-                                </div>
-                              ))}
+                            {question.type === 'short-answer' ? (
+                              <div className="space-y-2">
+                                <label className="block text-sm font-medium text-accent-silver">
+                                  Correct Answer
+                                </label>
+                                <input
+                                  type="text"
+                                  value={question.options[0] || ''}
+                                  onChange={(e) => {
+                                    handleQuestionEdit(index, { 
+                                      options: [e.target.value],
+                                      correctOptionIndex: 0
+                                    })
+                                  }}
+                                  className="w-full bg-white/5 rounded-lg px-4 py-2 text-white"
+                                  placeholder="Enter the correct answer"
+                                />
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {question.options.map((option, optionIndex) => (
+                                  <div key={optionIndex} className="flex items-center gap-2">
+                                    <input
+                                      type="radio"
+                                      checked={question.correctOptionIndex === optionIndex}
+                                      onChange={() => handleQuestionEdit(index, { correctOptionIndex: optionIndex })}
+                                      className="text-accent-neon"
+                                      aria-label={`Set as correct answer for option ${optionIndex + 1}`}
+                                    />
+                                    <input
+                                      type="text"
+                                      value={option}
+                                      onChange={(e) => {
+                                        const newOptions = [...question.options]
+                                        newOptions[optionIndex] = e.target.value
+                                        handleQuestionEdit(index, { options: newOptions })
+                                      }}
+                                      className="flex-1 bg-white/5 rounded-lg px-4 py-2 text-white"
+                                      placeholder={`Option ${optionIndex + 1}`}
+                                      aria-label={`Option ${optionIndex + 1}`}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex gap-4">
+                              <select
+                                value={question.type}
+                                onChange={(e) => {
+                                  const newType = e.target.value as 'multiple-choice' | 'true-false' | 'short-answer'
+                                  let newOptions: string[]
+                                  let newCorrectIndex = 0
+
+                                  switch (newType) {
+                                    case 'short-answer':
+                                      newOptions = [question.options[question.correctOptionIndex] || '']
+                                      break
+                                    case 'true-false':
+                                      newOptions = ['True', 'False']
+                                      break
+                                    default: // multiple-choice
+                                      newOptions = question.options.length >= 2 ? question.options : ['', '', '', '']
+                                      break
+                                  }
+
+                                  handleQuestionEdit(index, { 
+                                    type: newType,
+                                    options: newOptions,
+                                    correctOptionIndex: newCorrectIndex
+                                  })
+                                }}
+                                className="bg-white/5 rounded-lg px-4 py-2 text-white"
+                                aria-label="Question type"
+                              >
+                                <option value="multiple-choice">Multiple Choice</option>
+                                <option value="true-false">True/False</option>
+                                <option value="short-answer">Short Answer</option>
+                              </select>
+                              <select
+                                value={question.difficulty}
+                                onChange={(e) => handleQuestionEdit(index, { 
+                                  difficulty: e.target.value as DifficultyLevel 
+                                })}
+                                className="bg-white/5 rounded-lg px-4 py-2 text-white"
+                                aria-label="Question difficulty"
+                              >
+                                <option value="beginner">Beginner</option>
+                                <option value="intermediate">Intermediate</option>
+                                <option value="advanced">Advanced</option>
+                              </select>
                             </div>
-                            <select
-                              value={question.difficulty}
-                              onChange={(e) => handleQuestionEdit(index, { 
-                                difficulty: e.target.value as DifficultyLevel 
-                              })}
-                              className="bg-white/5 rounded-lg px-4 py-2 text-white"
-                              aria-label="Question difficulty"
-                            >
-                              <option value="beginner">Beginner</option>
-                              <option value="intermediate">Intermediate</option>
-                              <option value="advanced">Advanced</option>
-                            </select>
                             <div className="flex justify-end">
                               <button
                                 onClick={() => setEditingIndex(null)}
@@ -220,20 +289,29 @@ export default function QuizReviewForm({
                                 </button>
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              {question.options.map((option, optionIndex) => (
-                                <div
-                                  key={optionIndex}
-                                  className={`p-3 rounded-lg ${
-                                    question.correctOptionIndex === optionIndex
-                                      ? 'bg-accent-neon/20 text-accent-neon'
-                                      : 'bg-white/5 text-accent-silver'
-                                  }`}
-                                >
-                                  {option || `Option ${optionIndex + 1}`}
+                            {question.type === 'short-answer' ? (
+                              <div className="space-y-2">
+                                <span className="text-sm text-accent-silver">Correct Answer:</span>
+                                <div className="p-3 rounded-lg bg-accent-neon/20 text-accent-neon">
+                                  {question.options[0] || 'No answer provided'}
                                 </div>
-                              ))}
-                            </div>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-2">
+                                {question.options.map((option, optionIndex) => (
+                                  <div
+                                    key={optionIndex}
+                                    className={`p-3 rounded-lg ${
+                                      question.correctOptionIndex === optionIndex
+                                        ? 'bg-accent-neon/20 text-accent-neon'
+                                        : 'bg-white/5 text-accent-silver'
+                                    }`}
+                                  >
+                                    {option || `Option ${optionIndex + 1}`}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             <div className="flex justify-between text-sm text-accent-silver">
                               <span className="capitalize">{question.difficulty}</span>
                               <span className="capitalize">{question.type}</span>
@@ -252,15 +330,35 @@ export default function QuizReviewForm({
       </DragDropContext>
 
       <div className="flex justify-between">
-        <motion.button
-          onClick={handleAddQuestion}
-          className="flex items-center gap-2 px-4 py-2 text-accent-neon hover:text-accent-neon/80"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          <PlusIcon className="h-5 w-5" />
-          Add Question
-        </motion.button>
+        <div className="flex items-center gap-2">
+          <motion.button
+            onClick={() => handleAddQuestion('multiple-choice')}
+            className="flex items-center gap-2 px-4 py-2 text-accent-neon hover:text-accent-neon/80"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <PlusIcon className="h-5 w-5" />
+            Add Multiple Choice
+          </motion.button>
+          <motion.button
+            onClick={() => handleAddQuestion('true-false')}
+            className="flex items-center gap-2 px-4 py-2 text-accent-neon hover:text-accent-neon/80"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <PlusIcon className="h-5 w-5" />
+            Add True/False
+          </motion.button>
+          <motion.button
+            onClick={() => handleAddQuestion('short-answer')}
+            className="flex items-center gap-2 px-4 py-2 text-accent-neon hover:text-accent-neon/80"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <PlusIcon className="h-5 w-5" />
+            Add Short Answer
+          </motion.button>
+        </div>
 
         <motion.button
           onClick={handleSave}

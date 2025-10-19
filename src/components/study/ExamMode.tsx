@@ -13,6 +13,9 @@ interface ExamModeProps {
   card: ICard
   onNext: () => void
   onReview: (quality: number) => void
+  currentCardIndex?: number
+  totalCards?: number
+  showProgress?: boolean
 }
 
 interface FeedbackType {
@@ -24,7 +27,10 @@ interface FeedbackType {
 export default function ExamMode({ 
   card, 
   onNext, 
-  onReview, 
+  onReview,
+  currentCardIndex = 0,
+  totalCards = 1,
+  showProgress = true,
 }: ExamModeProps) {
   const { data: session } = useSession()
   const [answer, setAnswer] = useState('')
@@ -72,7 +78,7 @@ export default function ExamMode({
 
       // Set feedback directly from the response
       setFeedback(data)
-      onReview(data.score)
+      // Don't call onReview here - wait for user to click Next
     } catch (error) {
       console.error('Error in handleSubmit:', error)
       setError(error instanceof Error ? error.message : 'Failed to evaluate answer. Please try again.')
@@ -82,6 +88,10 @@ export default function ExamMode({
   }
 
   const handleNext = () => {
+    // Call onReview with the score when user clicks Next
+    if (feedback) {
+      onReview(feedback.score)
+    }
     setAnswer('')
     setFeedback(null)
     onNext()

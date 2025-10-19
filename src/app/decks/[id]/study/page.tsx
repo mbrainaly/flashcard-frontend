@@ -220,8 +220,9 @@ export default function StudySessionPage({ params }: StudySessionPageProps) {
         remaining: prev.remaining - 1,
       }))
 
-      // Move to next card
-      if (currentCardIndex < cards.length - 1) {
+      // Move to next card (only for non-exam modes)
+      // Exam mode handles card advancement through onNext callback
+      if (selectedMode !== 'exam' && currentCardIndex < cards.length - 1) {
         setCurrentCardIndex((prev) => prev + 1)
         setIsFlipped(false)
       }

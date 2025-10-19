@@ -5,19 +5,9 @@ import { useSession, getSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import { 
   UserCircleIcon,
-  AcademicCapIcon,
-  ClockIcon,
-  ChartBarIcon,
-  CogIcon,
-  CreditCardIcon,
-  SparklesIcon,
-  ArrowTopRightOnSquareIcon
+  CogIcon
 } from '@heroicons/react/24/outline'
-import Link from 'next/link'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
-import { StudyProgress } from '@/types/study'
-import { getStudyProgress, getDashboardStats } from '@/services/dashboard.service'
-import { getSubscription } from '@/services/subscription.service'
 import { fetchWithAuth } from '@/utils/fetchWithAuth'
 import { showToast } from '@/components/ui/Toast'
 import { getSessionCoalesced } from '@/utils/fetchWithAuth'
@@ -31,20 +21,11 @@ interface UserProfile {
   provider?: string
 }
 
-interface SubscriptionPlan {
-  id: string
-  name: string
-  price: string
-  credits: number
-  nextRenewal?: string
-}
 
 export default function ProfilePage() {
   const { data: session } = useSession()
   const accessToken = (session?.user as Record<string, unknown> | undefined)?.['accessToken'] as string | undefined
   const [isLoading, setIsLoading] = useState(true)
-  const [studyProgress, setStudyProgress] = useState<StudyProgress | null>(null)
-  const [dashStats, setDashStats] = useState<{ totalFlashcards: number; totalNotes: number; totalQuizzes: number } | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
   const [isChangePasswordMode, setIsChangePasswordMode] = useState(false)
@@ -58,13 +39,6 @@ export default function ProfilePage() {
     confirmPassword: '',
   })
   const [error, setError] = useState('')
-  const [subscription, setSubscription] = useState<SubscriptionPlan>({
-    id: 'basic',
-    name: 'Basic',
-    price: '$0',
-    credits: 50,
-    nextRenewal: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
-  })
 
   const handleEditProfile = () => {
     if (userProfile) {
@@ -199,18 +173,8 @@ export default function ProfilePage() {
       try {
         setIsLoading(true)
         
-        // Fetch study progress and dashboard stats in parallel
-        const [progress, stats, userData] = await Promise.all([
-          getStudyProgress() as unknown as Promise<StudyProgress>,
-          getDashboardStats(),
-          fetchWithAuth('/api/auth/me').then(res => res.json())
-        ])
-        setStudyProgress(progress as StudyProgress)
-        setDashStats({
-          totalFlashcards: stats.totalFlashcards,
-          totalNotes: stats.totalNotes,
-          totalQuizzes: stats.totalQuizzes,
-        })
+        // Fetch user data
+        const userData = await fetchWithAuth('/api/auth/me').then(res => res.json())
 
         // Set user profile from backend data (most up-to-date)
         setUserProfile({
@@ -223,28 +187,6 @@ export default function ProfilePage() {
         })
         
         console.log('User provider:', userData.user.provider)
-
-        // Fetch subscription data from the backend
-        try {
-          const subscriptionData = await getSubscription()
-          setSubscription({
-            id: subscriptionData.planDetails?.id || subscriptionData.plan,
-            name: subscriptionData.planDetails?.name || subscriptionData.plan.charAt(0).toUpperCase() + subscriptionData.plan.slice(1),
-            price: subscriptionData.planDetails?.price ? `$${subscriptionData.planDetails.price}` : (subscriptionData.plan === 'basic' ? '$0' : subscriptionData.plan === 'pro' ? '$15' : '$49'),
-            credits: subscriptionData.credits,
-            nextRenewal: subscriptionData.currentPeriodEnd ? new Date(subscriptionData.currentPeriodEnd).toLocaleDateString() : undefined
-          })
-        } catch (error) {
-          console.error('Error fetching subscription:', error)
-          // Fallback to basic plan if there's an error
-          setSubscription({
-            id: 'basic',
-            name: 'Basic',
-            price: '$0',
-            credits: 50,
-            nextRenewal: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
-          })
-        }
       } catch (error) {
         console.error('Error fetching profile data:', error)
       } finally {
@@ -258,41 +200,6 @@ export default function ProfilePage() {
     // Only run this effect when accessToken changes
   }, [accessToken])
 
-  // Live credits refresh (focus + interval) - using a reasonable interval
-  useEffect(() => {
-    if (!accessToken) return
-    let mounted = true
-    const refresh = async () => {
-      try {
-        const data = await getSubscription()
-        if (mounted) {
-          setSubscription({
-            id: data.planDetails?.id || data.plan,
-            name: data.planDetails?.name || data.plan.charAt(0).toUpperCase() + data.plan.slice(1),
-            price: data.planDetails?.price ? `$${data.planDetails.price}` : (data.plan === 'basic' ? '$0' : data.plan === 'pro' ? '$15' : '$49'),
-            credits: data.credits,
-            nextRenewal: data.currentPeriodEnd ? new Date(data.currentPeriodEnd).toLocaleDateString() : undefined
-          })
-        }
-      } catch (_) {}
-    }
-    
-    // Only refresh on focus, not constantly
-    const onFocus = () => refresh()
-    window.addEventListener('focus', onFocus)
-    const onVisibility = () => { if (document.visibilityState === 'visible') refresh() }
-    document.addEventListener('visibilitychange', onVisibility)
-    
-    // Use a more reasonable interval (60 seconds instead of 10)
-    const id = setInterval(refresh, 60000)
-    
-    return () => {
-      mounted = false
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onVisibility)
-      clearInterval(id)
-    }
-  }, [accessToken])
 
   if (isLoading) {
     return (
@@ -345,62 +252,13 @@ export default function ProfilePage() {
           </div>
         </motion.div>
 
-        {/* Stats Grid */}
+        {/* Account Settings */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+          className="max-w-2xl mx-auto"
         >
-          {[
-            {
-              label: 'Quiz Average',
-              value: `${studyProgress?.quizAverage || 0}%`,
-              icon: AcademicCapIcon,
-              color: 'text-accent-neon'
-            },
-            {
-              label: 'Flashcard Mastery',
-              value: `${studyProgress?.flashcardMastery || 0}%`,
-              icon: ChartBarIcon,
-              color: 'text-accent-gold'
-            },
-            {
-              label: 'Study Time',
-              value: `${Math.round((studyProgress?.totalStudyTime || 0) / 3600)}h`,
-              icon: ClockIcon,
-              color: 'text-accent-silver'
-            },
-            {
-              label: 'Subjects',
-              value: studyProgress?.subjectProgress.length || 0,
-              icon: AcademicCapIcon,
-              color: 'text-accent-neon'
-            }
-          ].map((stat, index) => (
-            <div
-              key={stat.label}
-              className="bg-glass backdrop-blur-sm rounded-xl p-6 ring-1 ring-accent-silver/10"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-accent-silver text-sm">{stat.label}</p>
-                  <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
-                </div>
-                <stat.icon className={`h-8 w-8 ${stat.color}`} />
-              </div>
-            </div>
-          ))}
-        </motion.div>
-
-        {/* Settings and Subscription Grid */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6"
-        >
-          {/* Account Settings */}
           <div className="bg-glass backdrop-blur-sm rounded-xl p-6 ring-1 ring-accent-silver/10">
             <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
               <CogIcon className="h-5 w-5 text-accent-neon" />
@@ -538,86 +396,8 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
-
-          {/* Subscription Details */}
-          <div className="bg-glass backdrop-blur-sm rounded-xl p-6 ring-1 ring-accent-silver/10">
-            <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-              <CreditCardIcon className="h-5 w-5 text-accent-neon" />
-              Subscription & Limits
-            </h2>
-
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-medium text-white">{subscription.name} Plan</h3>
-                  <p className="text-accent-silver text-sm">{subscription.price}/month</p>
-                </div>
-                <div className="bg-accent-neon/10 px-3 py-1 rounded-full">
-                  <span className="text-accent-neon text-sm font-medium">Active</span>
-                </div>
-              </div>
-              
-              {subscription.nextRenewal && (
-                <p className="text-sm text-accent-silver mb-4">
-                  Next renewal: {subscription.nextRenewal}
-                </p>
-              )}
-              
-              <Link 
-                href="/billing" 
-                className="inline-flex items-center gap-1 text-accent-neon hover:text-white transition-colors text-sm"
-              >
-                Manage subscription <ArrowTopRightOnSquareIcon className="h-3 w-3" />
-              </Link>
-            </div>
-
-            <div className="border-t border-accent-silver/10 pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-medium text-white flex items-center gap-2">
-                  <SparklesIcon className="h-5 w-5 text-accent-gold" />
-                  AI Credits
-                </h3>
-                <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-accent-gold to-accent-neon">
-                  {subscription.credits}
-                </span>
-              </div>
-              
-              <div className="bg-white/5 h-2 rounded-full overflow-hidden mb-2">
-                <div 
-                  className="bg-gradient-to-r from-accent-gold to-accent-neon h-full rounded-full" 
-                  style={{ width: `${(subscription.credits / 50) * 100}%` }}
-                />
-              </div>
-              
-              <p className="text-sm text-accent-silver mb-4">
-                {subscription.credits} credits remaining this month
-              </p>
-              
-              <LiveCreditCosts />
-            </div>
-          </div>
         </motion.div>
       </div>
-    </div>
-  )
-} 
-
-function LiveCreditCosts() {
-  // If we later expose an API for dynamic credit costs, fetch here.
-  // For now, import from backend config equivalent by mirroring constants.
-  const items = [
-    { label: 'Flashcard generation', cost: 1 },
-    { label: 'Quiz generation', cost: 2 },
-    { label: 'Notes analysis', cost: 3 },
-  ] as const
-  return (
-    <div className="space-y-2">
-      {items.map((x) => (
-        <div key={x.label} className="flex justify-between text-sm">
-          <span className="text-accent-silver">{x.label}</span>
-          <span className="text-white">{x.cost} {x.cost === 1 ? 'credit' : 'credits'}</span>
-        </div>
-      ))}
     </div>
   )
 }
