@@ -32,6 +32,7 @@ export default function QuizPage() {
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [selectedAnswers, setSelectedAnswers] = useState<number[]>([])
+  const [shortAnswerTexts, setShortAnswerTexts] = useState<string[]>([])
   const [showResults, setShowResults] = useState(false)
   const [quizResults, setQuizResults] = useState<{
     score: number
@@ -75,6 +76,7 @@ export default function QuizPage() {
         console.log('Quiz fetched successfully:', data.quiz);
         setQuiz(data.quiz)
         setSelectedAnswers(new Array(data.quiz.questions.length).fill(-1))
+        setShortAnswerTexts(new Array(data.quiz.questions.length).fill(''))
       } catch (err) {
         console.error('Error fetching quiz:', err)
         setError(err instanceof Error ? err.message : 'Failed to fetch quiz')
@@ -114,7 +116,10 @@ export default function QuizPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.user.accessToken}`,
         },
-        body: JSON.stringify({ answers: selectedAnswers }),
+        body: JSON.stringify({ 
+          answers: selectedAnswers,
+          shortAnswerTexts: shortAnswerTexts 
+        }),
       })
 
       if (!response.ok) {
@@ -199,20 +204,41 @@ export default function QuizPage() {
                     <div>
                       <h3 className="text-white font-medium mb-2">{question.question}</h3>
                       <div className="space-y-2 mb-4">
-                        {question.options.map((option, optionIndex) => (
-                          <div
-                            key={optionIndex}
-                            className={`p-3 rounded-lg ${
-                              optionIndex === quizResults.correctAnswers[index]
-                                ? 'bg-green-500/20 text-green-500'
-                                : optionIndex === selectedAnswers[index]
-                                ? 'bg-red-500/20 text-red-500'
-                                : 'bg-white/5 text-accent-silver'
-                            }`}
-                          >
-                            {option}
+                        {question.type === 'short-answer' ? (
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <p className="text-sm text-accent-silver">Your Answer:</p>
+                              <div className={`p-3 rounded-lg ${
+                                quizResults.detailedAnswers?.[index]?.isCorrect
+                                  ? 'bg-green-500/20 text-green-500'
+                                  : 'bg-red-500/20 text-red-500'
+                              }`}>
+                                {shortAnswerTexts[index] || 'No answer provided'}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-sm text-accent-silver">Correct Answer:</p>
+                              <div className="p-3 rounded-lg bg-accent-neon/20 text-accent-neon">
+                                {question.options[0] || 'No correct answer available'}
+                              </div>
+                            </div>
                           </div>
-                        ))}
+                        ) : (
+                          question.options.map((option, optionIndex) => (
+                            <div
+                              key={optionIndex}
+                              className={`p-3 rounded-lg ${
+                                optionIndex === quizResults.correctAnswers[index]
+                                  ? 'bg-green-500/20 text-green-500'
+                                  : optionIndex === selectedAnswers[index]
+                                  ? 'bg-red-500/20 text-red-500'
+                                  : 'bg-white/5 text-accent-silver'
+                              }`}
+                            >
+                              {option}
+                            </div>
+                          ))
+                        )}
                       </div>
                       <div className="text-sm text-accent-silver">
                         <strong className="text-accent-neon">Explanation:</strong>{' '}
@@ -297,23 +323,52 @@ export default function QuizPage() {
               <h2 className="text-xl font-semibold text-white mb-6">
                 {quiz.questions[currentQuestion].question}
               </h2>
-              <div className="space-y-4">
-                {quiz.questions[currentQuestion].options.map((option, index) => (
-                  <motion.button
-                    key={index}
-                    onClick={() => handleAnswerSelect(index)}
-                    className={`w-full p-4 rounded-lg text-left transition-colors ${
-                      selectedAnswers[currentQuestion] === index
-                        ? 'bg-accent-neon text-black'
-                        : 'bg-white/5 text-accent-silver hover:bg-white/10'
-                    }`}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    {option}
-                  </motion.button>
-                ))}
-              </div>
+              {/* Options or Text Input based on question type */}
+              {quiz.questions[currentQuestion].type === 'short-answer' ? (
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-accent-silver">
+                    Your Answer
+                  </label>
+                  <textarea
+                    value={shortAnswerTexts[currentQuestion]}
+                    onChange={(e) => {
+                      const newTexts = [...shortAnswerTexts]
+                      newTexts[currentQuestion] = e.target.value
+                      setShortAnswerTexts(newTexts)
+                      // Mark as answered if there's text
+                      if (e.target.value.trim()) {
+                        handleAnswerSelect(0) // Always select index 0 for short-answer
+                      } else {
+                        // Clear answer if text is empty
+                        const newAnswers = [...selectedAnswers]
+                        newAnswers[currentQuestion] = -1
+                        setSelectedAnswers(newAnswers)
+                      }
+                    }}
+                    className="w-full p-4 rounded-lg bg-white/5 text-white placeholder-accent-silver/50 border border-accent-silver/20 focus:border-accent-neon focus:outline-none focus:ring-1 focus:ring-accent-neon resize-none"
+                    placeholder="Type your answer here..."
+                    rows={3}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {quiz.questions[currentQuestion].options.map((option, index) => (
+                    <motion.button
+                      key={index}
+                      onClick={() => handleAnswerSelect(index)}
+                      className={`w-full p-4 rounded-lg text-left transition-colors ${
+                        selectedAnswers[currentQuestion] === index
+                          ? 'bg-accent-neon text-black'
+                          : 'bg-white/5 text-accent-silver hover:bg-white/10'
+                      }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {option}
+                    </motion.button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-between">

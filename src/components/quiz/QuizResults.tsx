@@ -1,14 +1,16 @@
 import { motion } from 'framer-motion'
 import { CheckCircleIcon, XCircleIcon, ClockIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
-import { QuizSubmissionResult } from '@/types/quiz'
+import { QuizSubmissionResult, IQuiz } from '@/types/quiz'
 
 interface QuizResultsProps {
   result: QuizSubmissionResult
+  quiz?: IQuiz // Add quiz data to show actual questions and answers
+  shortAnswerTexts?: string[] // Add short answer texts for display
   onRetry?: () => void
   onExit: () => void
 }
 
-export default function QuizResults({ result, onRetry, onExit }: QuizResultsProps) {
+export default function QuizResults({ result, quiz, shortAnswerTexts, onRetry, onExit }: QuizResultsProps) {
   const scorePercentage = (result.score).toFixed(1)
   const passedQuiz = result.passed
 
@@ -76,38 +78,93 @@ export default function QuizResults({ result, onRetry, onExit }: QuizResultsProp
           className="space-y-4"
         >
           <h2 className="text-xl font-semibold text-white">Question Details</h2>
-          <div className="space-y-4">
-            {result.detailedAnswers.map((answer, index) => (
-              <div
-                key={index}
-                className={`p-4 rounded-lg ${
-                  answer.isCorrect ? 'bg-green-500/10' : 'bg-red-500/10'
-                }`}
-              >
-                <div className="flex items-start gap-4">
-                  <div className={`p-2 rounded-full ${
-                    answer.isCorrect ? 'bg-green-500/20' : 'bg-red-500/20'
-                  }`}>
-                    {answer.isCorrect ? (
-                      <CheckCircleIcon className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <XCircleIcon className="h-5 w-5 text-red-500" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-white/90">Question {index + 1}</p>
-                    <p className="text-sm text-accent-silver">
-                      Time spent: {Math.round(answer.timeTaken || 0)} seconds
-                    </p>
-                    {!answer.isCorrect && answer.explanation && (
-                      <p className="mt-2 text-sm text-accent-silver">
-                        {answer.explanation}
-                      </p>
-                    )}
+          <div className="space-y-6">
+            {result.detailedAnswers.map((answer, index) => {
+              const question = quiz?.questions[index];
+              return (
+                <div
+                  key={index}
+                  className={`p-6 rounded-lg ${
+                    answer.isCorrect ? 'bg-green-500/10' : 'bg-red-500/10'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-2 rounded-full ${
+                      answer.isCorrect ? 'bg-green-500/20' : 'bg-red-500/20'
+                    }`}>
+                      {answer.isCorrect ? (
+                        <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <XCircleIcon className="h-5 w-5 text-red-500" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-white font-medium mb-2">
+                        Question {index + 1}: {question?.question || 'Question not available'}
+                      </h3>
+                      
+                      {/* Show answers based on question type */}
+                      {question && (
+                        <div className="space-y-3 mb-4">
+                          {question.type === 'short-answer' ? (
+                            <div className="space-y-3">
+                              <div className="space-y-2">
+                                <p className="text-sm text-accent-silver">Your Answer:</p>
+                                <div className={`p-3 rounded-lg ${
+                                  answer.isCorrect
+                                    ? 'bg-green-500/20 text-green-500'
+                                    : 'bg-red-500/20 text-red-500'
+                                }`}>
+                                  {shortAnswerTexts?.[index] || 'No answer provided'}
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-sm text-accent-silver">Correct Answer:</p>
+                                <div className="p-3 rounded-lg bg-accent-neon/20 text-accent-neon">
+                                  {question.options[0] || 'No correct answer available'}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            question.options.map((option, optionIndex) => (
+                              <div
+                                key={optionIndex}
+                                className={`p-3 rounded-lg ${
+                                  optionIndex === question.correctOptionIndex
+                                    ? 'bg-green-500/20 text-green-500'
+                                    : optionIndex === answer.selectedOption
+                                    ? 'bg-red-500/20 text-red-500'
+                                    : 'bg-white/5 text-accent-silver'
+                                }`}
+                              >
+                                {option}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between text-sm text-accent-silver">
+                        <span>Time spent: {Math.round(answer.timeTaken || 0)} seconds</span>
+                        {answer.isCorrect ? (
+                          <span className="text-green-500">✓ Correct</span>
+                        ) : (
+                          <span className="text-red-500">✗ Incorrect</span>
+                        )}
+                      </div>
+                      
+                      {answer.explanation && (
+                        <div className="mt-3 p-3 bg-accent-silver/5 rounded-lg">
+                          <p className="text-sm text-accent-silver">
+                            <strong className="text-accent-neon">Explanation:</strong> {answer.explanation}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </motion.div>
       )}

@@ -88,6 +88,8 @@ export default function TakeQuizPage() {
     return (
       <QuizResults
         result={result}
+        quiz={result.quiz}
+        shortAnswerTexts={result.shortAnswerTexts}
         onRetry={handleRetry}
         onExit={handleExit}
       />

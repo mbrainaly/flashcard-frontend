@@ -14,6 +14,7 @@ export default function QuizSession({ quiz, onComplete, onExit }: QuizSessionPro
   const { data: session } = useSession()
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<number[]>(new Array(quiz.questions.length).fill(-1))
+  const [shortAnswerTexts, setShortAnswerTexts] = useState<string[]>(new Array(quiz.questions.length).fill(''))
   const [timeSpentPerQuestion, setTimeSpentPerQuestion] = useState<number[]>(new Array(quiz.questions.length).fill(0))
   const [remainingTime, setRemainingTime] = useState<number | null>(quiz.timeLimit ? quiz.timeLimit * 60 : null)
   const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now())
@@ -89,6 +90,7 @@ export default function QuizSession({ quiz, onComplete, onExit }: QuizSessionPro
         },
         body: JSON.stringify({
           answers: answers,
+          shortAnswerTexts: shortAnswerTexts, // Include the actual text for short-answer questions
           timeSpentPerQuestion: finalTimeSpent,
         }),
       })
@@ -109,7 +111,9 @@ export default function QuizSession({ quiz, onComplete, onExit }: QuizSessionPro
           ...ans,
           timeTaken: finalTimeSpent[index]
         })),
-        passed: result.passed
+        passed: result.passed,
+        quiz: quiz, // Pass the quiz data for detailed results
+        shortAnswerTexts: shortAnswerTexts // Pass short answer texts
       })
     } catch (err) {
       console.error('Error submitting quiz:', err)
@@ -164,22 +168,52 @@ export default function QuizSession({ quiz, onComplete, onExit }: QuizSessionPro
           </h2>
           <p className="text-lg text-white/90">{currentQuestion.question}</p>
 
-          {/* Options */}
-          <div className="grid gap-4">
-            {currentQuestion.options.map((option, optionIndex) => (
-              <button
-                key={optionIndex}
-                onClick={() => handleAnswerSelect(optionIndex)}
-                className={`p-4 rounded-lg text-left transition-all ${
-                  answers[currentQuestionIndex] === optionIndex
-                    ? 'bg-accent-neon text-black'
-                    : 'bg-white/5 text-white hover:bg-white/10'
-                }`}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
+          {/* Options or Text Input based on question type */}
+          {currentQuestion.type === 'short-answer' ? (
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-accent-silver">
+                Your Answer
+              </label>
+              <textarea
+                value={shortAnswerTexts[currentQuestionIndex]}
+                onChange={(e) => {
+                  const newTexts = [...shortAnswerTexts]
+                  newTexts[currentQuestionIndex] = e.target.value
+                  setShortAnswerTexts(newTexts)
+                  // Mark as answered if there's text
+                  if (e.target.value.trim()) {
+                    handleAnswerSelect(0) // Always select index 0 for short-answer
+                  } else {
+                    // Clear answer if text is empty
+                    setAnswers(prev => {
+                      const updated = [...prev]
+                      updated[currentQuestionIndex] = -1
+                      return updated
+                    })
+                  }
+                }}
+                className="w-full p-4 rounded-lg bg-white/5 text-white placeholder-accent-silver/50 border border-accent-silver/20 focus:border-accent-neon focus:outline-none focus:ring-1 focus:ring-accent-neon resize-none"
+                placeholder="Type your answer here..."
+                rows={3}
+              />
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {currentQuestion.options.map((option, optionIndex) => (
+                <button
+                  key={optionIndex}
+                  onClick={() => handleAnswerSelect(optionIndex)}
+                  className={`p-4 rounded-lg text-left transition-all ${
+                    answers[currentQuestionIndex] === optionIndex
+                      ? 'bg-accent-neon text-black'
+                      : 'bg-white/5 text-white hover:bg-white/10'
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
 

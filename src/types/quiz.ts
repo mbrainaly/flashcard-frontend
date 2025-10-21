@@ -70,5 +70,8 @@ export interface QuizSubmissionResult {
     selectedOption: number
     isCorrect: boolean
     timeTaken?: number
+    explanation?: string
   }[]
+  quiz?: IQuiz // Optional quiz data for detailed results
+  shortAnswerTexts?: string[] // Optional short answer texts
 } 
