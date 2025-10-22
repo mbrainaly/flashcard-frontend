@@ -133,15 +133,18 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     try {
       const url = selectedCard
         ? `${process.env.NEXT_PUBLIC_API_URL}/api/cards/${selectedCard._id}`
-        : `${process.env.NEXT_PUBLIC_API_URL}/api/decks/${id}/cards`
+        : `${process.env.NEXT_PUBLIC_API_URL}/api/cards/decks/${id}/cards`
       
       const method = selectedCard ? 'PUT' : 'POST'
 
-      // Create FormData to handle file upload
+      // Always use FormData to match backend multer middleware expectations
       const formData = new FormData()
-      formData.append('front', data.front)
-      formData.append('back', data.back)
       
+      // Ensure front and back are strings
+      formData.append('front', data.front || '')
+      formData.append('back', data.back || '')
+      
+      // Handle arrays properly for FormData
       if (data.hints?.length) {
         data.hints.forEach((hint, index) => {
           if (hint) formData.append(`hints[${index}]`, hint)
@@ -160,14 +163,21 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         })
       }
 
-      if (data.image) {
+      // Add image if present
+      if (data.image && data.image instanceof File) {
         formData.append('image', data.image)
       }
+      
+      console.log('Sending FormData with:')
+      console.log('- front:', data.front)
+      console.log('- back:', data.back)
+      console.log('- has image:', !!(data.image && data.image instanceof File))
       
       const response = await fetch(url, {
         method,
         headers: {
           Authorization: `Bearer ${session?.user?.accessToken}`,
+          // Don't set Content-Type - let browser set it with boundary for FormData
         },
         body: formData,
       })
