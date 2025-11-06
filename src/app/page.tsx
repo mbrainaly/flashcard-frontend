@@ -108,6 +108,16 @@ const textReveal = {
   transition: { duration: 0.8, ease: [0.33, 1, 0.68, 1] }
 }
 
+interface Testimonial {
+  _id: string
+  name: string
+  role: string
+  text: string
+  image?: string
+  time: string
+  likes: number
+}
+
 export default function Home() {
   const {
     isLoginOpen,
@@ -122,6 +132,10 @@ export default function Home() {
   // Animation states for the AI flashcard generation process
   const [animationStep, setAnimationStep] = useState(0)
   const animationRef = useRef(null)
+  
+  // Testimonials state
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([])
+  const [testimonialsLoading, setTestimonialsLoading] = useState(true)
   
   // Hero section quiz generation animation
   const [quizStep, setQuizStep] = useState(0)
@@ -152,6 +166,28 @@ export default function Home() {
       back: "A = πr²"
     }
   ]
+
+  // Fetch testimonials from API
+  useEffect(() => {
+    const fetchTestimonials = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/testimonials`)
+        const data = await response.json()
+        
+        if (data.success && data.data) {
+          setTestimonials(data.data)
+        }
+      } catch (error) {
+        console.error('Error fetching testimonials:', error)
+        // Fallback to empty array if API fails
+        setTestimonials([])
+      } finally {
+        setTestimonialsLoading(false)
+      }
+    }
+
+    fetchTestimonials()
+  }, [])
 
   // Animation steps for the flashcard generation section
   const animationSteps = [
@@ -550,132 +586,69 @@ export default function Home() {
           </motion.div>
 
           {/* Testimonials */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-            className="relative mt-16"
-          >
-            <style jsx global>{testimonialAnimation}</style>
-            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-[#0a0a0a] via-transparent to-[#0a0a0a] pointer-events-none z-10"></div>
-            
-            <div className="mx-auto overflow-hidden">
-              <div className="relative flex gap-6 overflow-hidden py-4">
-                <div 
-                  className="flex gap-6 animate-[scroll_30s_linear_infinite]"
-                  style={{ width: 'fit-content' }}
-                >
-                  {[
-                    {
-                      name: 'Lucas Martin',
-                      role: 'Sciences Po',
-                      image: '/testimonials/user1.jpg',
-                      text: 'Great for political science and history courses!',
-                      time: '9d',
-                      likes: 17
-                    },
-                    {
-                      name: 'Sarah Chen',
-                      role: 'Harvard University',
-                      image: '/testimonials/user2.jpg',
-                      text: 'Studyflash saved me so much time studying for my investment banking midterm!',
-                      time: '12d',
-                      likes: 16
-                    },
-                    {
-                      name: 'Michael Park',
-                      role: 'ETH Zürich',
-                      image: '/testimonials/user3.jpg',
-                      text: 'Thank you this app is revolutionary! And it helps a lot!',
-                      time: '27d',
-                      likes: 9
-                    },
-                    {
-                      name: 'Emma Rodriguez',
-                      role: 'Stanford University',
-                      image: '/testimonials/user4.jpg',
-                      text: 'The AI quiz generation feature is incredible for exam prep!',
-                      time: '3d',
-                      likes: 24
-                    },
-                    // Duplicate cards to create seamless loop
-                    {
-                      name: 'Lucas Martin',
-                      role: 'Sciences Po',
-                      image: '/testimonials/user1.jpg',
-                      text: 'Great for political science and history courses!',
-                      time: '9d',
-                      likes: 17
-                    },
-                    {
-                      name: 'Sarah Chen',
-                      role: 'Harvard University',
-                      image: '/testimonials/user2.jpg',
-                      text: 'Studyflash saved me so much time studying for my investment banking midterm!',
-                      time: '12d',
-                      likes: 16
-                    },
-                    {
-                      name: 'Michael Park',
-                      role: 'ETH Zürich',
-                      image: '/testimonials/user3.jpg',
-                      text: 'Thank you this app is revolutionary! And it helps a lot!',
-                      time: '27d',
-                      likes: 9
-                    },
-                    {
-                      name: 'Emma Rodriguez',
-                      role: 'Stanford University',
-                      image: '/testimonials/user4.jpg',
-                      text: 'The AI quiz generation feature is incredible for exam prep!',
-                      time: '3d',
-                      likes: 24
-                    }
-                  ].map((testimonial, index) => (
-                    <div
-                      key={index}
-                      className="flex-none w-[350px] bg-[#151515] rounded-xl p-6 shadow-premium ring-1 ring-accent-silver/10 backdrop-blur-sm hover:shadow-lg hover:bg-[#181818] transition-all duration-300"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="relative h-12 w-12 overflow-hidden rounded-full ring-2 ring-accent-neon/20">
-                          <div className="absolute inset-0 bg-gradient-to-br from-accent-neon/20 to-accent-gold/20 animate-pulse"></div>
-                          <img
-                            src={testimonial.image}
-                            alt={testimonial.name}
-                            className="h-full w-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(testimonial.name)}&background=111111&color=80E9FF`;
-                            }}
-                          />
+          {!testimonialsLoading && testimonials.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.7, delay: 0.4 }}
+              className="relative mt-16"
+            >
+              <style jsx global>{testimonialAnimation}</style>
+              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-[#0a0a0a] via-transparent to-[#0a0a0a] pointer-events-none z-10"></div>
+              
+              <div className="mx-auto overflow-hidden">
+                <div className="relative flex gap-6 overflow-hidden py-4">
+                  <div 
+                    className="flex gap-6 animate-[scroll_30s_linear_infinite]"
+                    style={{ width: 'fit-content' }}
+                  >
+                    {/* Duplicate testimonials for seamless loop */}
+                    {[...testimonials, ...testimonials].map((testimonial, index) => (
+                      <div
+                        key={`${testimonial._id}-${index}`}
+                        className="flex-none w-[350px] bg-[#151515] rounded-xl p-6 shadow-premium ring-1 ring-accent-silver/10 backdrop-blur-sm hover:shadow-lg hover:bg-[#181818] transition-all duration-300"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="relative h-12 w-12 overflow-hidden rounded-full ring-2 ring-accent-neon/20">
+                            <div className="absolute inset-0 bg-gradient-to-br from-accent-neon/20 to-accent-gold/20 animate-pulse"></div>
+                            <img
+                              src={testimonial.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(testimonial.name)}&background=111111&color=80E9FF`}
+                              alt={testimonial.name}
+                              className="h-full w-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(testimonial.name)}&background=111111&color=80E9FF`;
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-semibold text-white">{testimonial.name}</h3>
+                            <p className="text-sm text-accent-silver">{testimonial.role}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-base font-semibold text-white">{testimonial.name}</h3>
-                          <p className="text-sm text-accent-silver">{testimonial.role}</p>
+                        <p className="mt-4 text-base text-white leading-relaxed">{testimonial.text}</p>
+                        <div className="mt-4 flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-accent-silver">
+                            <span>{testimonial.time}</span>
+                            <button className="text-accent-silver hover:text-accent-neon transition-colors">Reply</button>
+                          </div>
+                          <div className="flex items-center gap-1 text-accent-silver">
+                            <button className="group flex items-center gap-1 hover:text-accent-neon transition-colors">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:fill-accent-neon/10 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                              </svg>
+                              <span>{testimonial.likes}</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <p className="mt-4 text-base text-white leading-relaxed">{testimonial.text}</p>
-                      <div className="mt-4 flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm text-accent-silver">
-                          <span>{testimonial.time}</span>
-                          <button className="text-accent-silver hover:text-accent-neon transition-colors">Reply</button>
-                        </div>
-                        <div className="flex items-center gap-1 text-accent-silver">
-                          <button className="group flex items-center gap-1 hover:text-accent-neon transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:fill-accent-neon/10 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                            </svg>
-                            <span>{testimonial.likes}</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          )}
           
           <motion.div 
             initial={{ opacity: 0, y: 20 }}

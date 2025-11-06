@@ -99,6 +99,12 @@ const menuItems: MenuItem[] = [
     permissions: ['pages.read']
   },
   {
+    name: 'Testimonials',
+    href: '/admin/dashboard/testimonials',
+    icon: ChatBubbleLeftRightIcon,
+    permissions: ['pages.read']
+  },
+  {
     name: 'Footer Menu',
     href: '/admin/dashboard/footer',
     icon: Bars3BottomLeftIcon,
